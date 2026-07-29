@@ -117,8 +117,6 @@ function Habilitadas({
   const asignaturas = respuesta.data ?? [];
   const cerrada = respuesta.extraValues?.cierreHecho === true;
   const eligePago = respuesta.extraValues?.formaPagoSeleccionable === true;
-  // Cada facultad define su tope; Medicina admite 5.
-  const tope = info?.facultad?.maxPreinscasig ?? 0;
 
   // value del turno/sección elegido por asignatura; ausente = no seleccionada.
   const [elegidas, setElegidas] = useState<Record<string, string>>(() => {
@@ -170,20 +168,23 @@ function Habilitadas({
 
     Alert.alert(
       'Guardar preinscripción',
-      `Se guardarán ${marcadas} materia(s).` +
-        (sinMarcar
-          ? `\n\nLas ${sinMarcar} sin marcar quedarán borradas de tu preinscripción, igual que en la web.`
-          : '') +
-        '\n\nEsto todavía no la envía: para eso hay que cerrarla.',
+      `Vas a guardar ${marcadas} materia(s)` +
+        (sinMarcar ? ` y dejar ${sinMarcar} sin marcar` : '') +
+        '.\n\nEn muchas facultades esto ya NO se puede deshacer ni completar ' +
+        'después. Revisá que estén todas las materias que vas a cursar.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Guardar',
+          style: 'destructive',
           onPress: async () => {
             setGuardando(true);
             try {
               await registrar();
-              Alert.alert('Guardada', 'Tu selección quedó guardada. Todavía podés modificarla.');
+              Alert.alert(
+                'Guardada',
+                'Tu selección se registró. Verificala en Preinscriptas.'
+              );
               onGuardado();
             } catch (err) {
               Alert.alert('No se pudo guardar', mensajeDe(err));
@@ -252,10 +253,14 @@ function Habilitadas({
 
   return (
     <>
-      <Aviso texto="Primero guardá tu selección y después cerrá la preinscripción para enviarla. Desmarcar una materia y guardar la borra." />
+      {/* La web dice que desmarcar y volver a guardar borra una materia, pero en
+          la práctica no siempre se puede deshacer: con `generarDeudaIns` la
+          matrícula se emite al guardar y queda fija. Mejor advertir de más. */}
+      <Aviso texto="Revisá bien antes de guardar: en muchas facultades la preinscripción no se puede deshacer ni completar después, aunque la web sugiera que sí. Elegí de una vez TODAS las materias del semestre." />
 
+      {/* Solo la cuenta: un "N de M" haría pensar que M es un tope, y no lo hay. */}
       <Text style={{ color: c.textSecondary, fontSize: 13, marginBottom: Spacing.one }}>
-        Seleccionadas: {Object.keys(elegidas).length} de {asignaturas.length}
+        Materias seleccionadas: {Object.keys(elegidas).length}
       </Text>
 
       {gruposPorCurso.map(([curso, lista]) => (
