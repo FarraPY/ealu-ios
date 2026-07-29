@@ -113,9 +113,12 @@ function Habilitadas({
   onGuardado: () => void;
 }) {
   const c = useColores();
+  const { info } = useSesion();
   const asignaturas = respuesta.data ?? [];
   const cerrada = respuesta.extraValues?.cierreHecho === true;
   const eligePago = respuesta.extraValues?.formaPagoSeleccionable === true;
+  // Cada facultad define su tope; Medicina admite 5.
+  const tope = info?.facultad?.maxPreinscasig ?? 0;
 
   // value del turno/sección elegido por asignatura; ausente = no seleccionada.
   const [elegidas, setElegidas] = useState<Record<string, string>>(() => {
@@ -127,6 +130,19 @@ function Habilitadas({
     return inicial;
   });
   const [guardando, setGuardando] = useState(false);
+
+  // La web separa las materias por semestre; sin eso, las optativas de cursos
+  // viejos se mezclan con las del semestre actual y no se distingue cuál es cuál.
+  const gruposPorCurso = useMemo(() => {
+    const mapa = new Map<string, AsignaturaHabilitada[]>();
+    for (const a of asignaturas) {
+      const clave = a.curso?.trim() || 'Sin curso';
+      mapa.set(clave, [...(mapa.get(clave) ?? []), a]);
+    }
+    return [...mapa.entries()].sort(
+      (x, y) => (x[1][0].codcurso ?? 0) - (y[1][0].codcurso ?? 0)
+    );
+  }, [asignaturas]);
 
   if (!asignaturas.length) return <Aviso texto={vacioDe('Materias', 'Disponibles')} />;
 
@@ -238,9 +254,17 @@ function Habilitadas({
     <>
       <Aviso texto="Primero guardá tu selección y después cerrá la preinscripción para enviarla. Desmarcar una materia y guardar la borra." />
 
-      {asignaturas.map((a) => {
-        const seleccionada = !!elegidas[a.codasign];
-        return (
+      <Text style={{ color: c.textSecondary, fontSize: 13, marginBottom: Spacing.one }}>
+        Seleccionadas: {Object.keys(elegidas).length} de {asignaturas.length}
+      </Text>
+
+      {gruposPorCurso.map(([curso, lista]) => (
+        <View key={curso}>
+          <Titulo>{curso}</Titulo>
+          {lista.map((a) => {
+            const seleccionada = !!elegidas[a.codasign];
+            const secciones = a.turnoSeccionList ?? [];
+            return (
           <Pressable key={a.codasign} onPress={() => a.puedeModificar && alternar(a)}>
             <Tarjeta>
               <View style={e.fila}>
@@ -257,7 +281,10 @@ function Habilitadas({
                     {a.asignaturaStr?.trim() || a.asignatura?.trim()}
                   </Text>
                   <Text style={{ color: c.textSecondary, fontSize: 13 }}>
-                    {[a.curso?.trim(), a.turnoSeccionList?.[0]?.text?.trim()]
+                    {[
+                      secciones.length === 1 ? secciones[0]?.text?.trim() : null,
+                      a.optativa ? 'Optativa' : null,
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </Text>
@@ -266,10 +293,42 @@ function Habilitadas({
                   ) : null}
                 </View>
               </View>
-            </Tarjeta>
-          </Pressable>
-        );
-      })}
+
+              {/* Con más de una sección hay que poder elegir turno y profesor,
+                  igual que el desplegable de la web. */}
+              {seleccionada && secciones.length > 1 ? (
+                <View style={e.secciones}>
+                  {secciones.map((s) => {
+                    const activa = elegidas[a.codasign] === s.value;
+                    return (
+                      <Pressable
+                        key={s.value}
+                        onPress={() =>
+                          setElegidas((prev) => ({ ...prev, [a.codasign]: s.value }))
+                        }
+                        style={[
+                          e.chip,
+                          { backgroundColor: activa ? c.marca : c.backgroundSelected },
+                        ]}>
+                        <Text
+                          style={{
+                            color: activa ? '#fff' : c.text,
+                            fontSize: 13,
+                            fontWeight: activa ? '600' : '400',
+                          }}>
+                          {s.text?.trim() || `${s.turno}/${s.seccion}`.trim()}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+                </Tarjeta>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
 
       <Pressable
         onPress={guardar}
@@ -363,6 +422,8 @@ const e = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  secciones: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, marginTop: Spacing.two },
+  chip: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderRadius: 8 },
   tilde: { color: '#fff', fontSize: 14, fontWeight: '700' },
   boton: {
     marginTop: Spacing.three,

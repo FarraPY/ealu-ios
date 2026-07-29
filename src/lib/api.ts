@@ -26,6 +26,8 @@ export type Facultad = {
   tieneParciales?: boolean;
   tienePreinscasig?: boolean;
   tieneInscexafinal?: boolean;
+  /** Tope de materias que admite una preinscripción (Medicina: 5). */
+  maxPreinscasig?: number;
 };
 
 export type Matricula = { codcarsec?: string; [k: string]: unknown };
@@ -221,6 +223,7 @@ export type AsignaturaHabilitada = {
   asignatura: string;
   asignaturaStr: string;
   curso: string;
+  codcurso: number | null;
   semestre: unknown;
   optativa: boolean;
   electiva: boolean;
