@@ -99,6 +99,11 @@ export type NotaLibre = Fila & {
 /** Estilos comunes. Las medidas son las del original, en milímetros sobre A4. */
 const ESTILOS = `
   @page { size: A4; margin: 10mm 10mm 10mm 15mm; }
+  /* Un documento impreso es blanco siempre. Sin esto, WebKit aplica el esquema
+     oscuro del sistema y el PDF sale con fondo negro si el teléfono está en
+     modo oscuro. */
+  :root { color-scheme: only light; }
+  html, body { background: #fff; }
   body { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #000; margin: 0; }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   .marco { border: 0.3mm solid #b4b4b4; height: 22mm; position: relative;
