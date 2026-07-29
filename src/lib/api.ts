@@ -366,6 +366,8 @@ export type NotaFinal = {
   observacion: string | null;
   fechaExaDMY: string | null;
   puntajeef: number | null;
+  /** 'S' cuando el semestre está completo; la web lo rotula en el PDF. */
+  cursocompleto: string | null;
 };
 
 // ------------------------------------------------- distribución de notas (info)

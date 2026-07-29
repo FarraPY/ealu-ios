@@ -32,7 +32,13 @@ function agrupar(notas: NotaFinal[]) {
   const mapa = new Map<number, { titulo: string; notas: NotaFinal[] }>();
   for (const n of notas) {
     const clave = n.codcurso ?? 0;
-    const g = mapa.get(clave) ?? { titulo: n.descripcurso?.trim() || 'Sin curso', notas: [] };
+    // El original rotula "(COMPLETO)" cuando el semestre está cerrado.
+    const completo = n.cursocompleto?.trim().toUpperCase() === 'S';
+    const base = n.descripcurso?.trim() || 'Sin curso';
+    const g = mapa.get(clave) ?? {
+      titulo: completo ? `${base} (COMPLETO)` : base,
+      notas: [],
+    };
     g.notas.push(n);
     mapa.set(clave, g);
   }
@@ -63,8 +69,10 @@ function html(d: DatosPdf): string {
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     body { font-family: -apple-system, Helvetica, sans-serif; font-size: 11px; color: #000; padding: 24px; }
     h1 { font-size: 13px; text-align: center; margin: 0; line-height: 1.5; }
-    .datos { margin: 16px 0 12px; font-size: 11px; }
+    .datos { margin: 16px 0 12px; font-size: 11px; border-top: 1px solid #000;
+             border-bottom: 1px solid #000; padding: 6px 0; }
     .datos div { margin-bottom: 3px; }
+    .linea { display: flex; justify-content: space-between; gap: 16px; }
     table { width: 100%; border-collapse: collapse; }
     th { font-size: 10px; text-align: left; border-bottom: 1px solid #000; padding: 4px 3px; }
     td { padding: 3px; font-size: 10.5px; }
@@ -78,8 +86,10 @@ function html(d: DatosPdf): string {
     <h1>UNIVERSIDAD NACIONAL DE ASUNCIÓN<br>${escapar(d.facultad)}<br>NOTAS FINALES</h1>
     <div class="datos">
       <div><b>CARRERA:</b> ${escapar(d.carrera)}</div>
-      <div><b>NOMBRES Y APELLIDOS:</b> ${escapar(d.nombre)}</div>
-      <div><b>CÉDULA:</b> ${escapar(d.cedula)}</div>
+      <div class="linea">
+        <span><b>NOMBRES Y APELLIDOS:</b> ${escapar(d.nombre)}</span>
+        <span><b>CÉDULA:</b> ${escapar(d.cedula)}</span>
+      </div>
     </div>
     <table>
       <thead><tr>
