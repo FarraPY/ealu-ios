@@ -209,6 +209,29 @@ export async function apiPostForm<T>(path: string, campos: Record<string, string
   return leerJson<T>(await pedir(path, init, true));
 }
 
+/**
+ * Respuesta de las escrituras envueltas.
+ *
+ * El backend contesta HTTP 200 incluso cuando rechaza la operación: el resultado
+ * real viene en `success`. Sin mirarlo, la app daría por guardado algo que el
+ * servidor descartó.
+ */
+export type RespuestaEscritura = {
+  success?: boolean;
+  errorMessage?: string | null;
+  successMessage?: string | null;
+  data?: unknown;
+  extraValues?: Record<string, unknown> | null;
+};
+
+/** Lanza si el backend marcó la operación como fallida. */
+export function verificarEscritura(r: RespuestaEscritura | null): RespuestaEscritura {
+  if (r && r.success === false) {
+    throw new ApiError(r.errorMessage?.trim() || 'El servidor rechazó la operación.');
+  }
+  return r ?? {};
+}
+
 // ------------------------------------------------------------------ inscripción
 
 export type TurnoSeccion = {

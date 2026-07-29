@@ -20,7 +20,9 @@ import {
   AsignaturaHabilitada,
   desenvolver,
   Inscripcion,
+  RespuestaEscritura,
   RespuestaHabilitadas,
+  verificarEscritura,
 } from '@/lib/api';
 import { useSesion } from '@/lib/sesion';
 import { useApi } from '@/lib/useApi';
@@ -155,13 +157,21 @@ function Habilitadas({
     });
   }
 
-  /** Paso 1: guarda el borrador. Reversible mientras no se cierre. */
-  async function registrar(): Promise<void> {
-    await apiPostForm(`registrar-preinscripciones/${codcarsec}`, {
-      anhoConvocCodcarsecCodasignTurnoSeccionList: Object.values(elegidas)
-        .filter(Boolean)
-        .join(','),
-    });
+  /**
+   * Paso 1: guarda el borrador. Reversible mientras no se cierre.
+   *
+   * El separador es `;` y va también al final de cada elemento: así arma la
+   * cadena la web (`n += value + ";"`). Con comas el backend la rechaza y
+   * responde 200 con `success: false`, sin guardar nada.
+   */
+  async function registrar(): Promise<RespuestaEscritura> {
+    const lista = Object.values(elegidas).filter(Boolean);
+    const cuerpo = lista.length ? lista.join(';') + ';' : '';
+    const r = await apiPostForm<RespuestaEscritura>(
+      `registrar-preinscripciones/${codcarsec}`,
+      { anhoConvocCodcarsecCodasignTurnoSeccionList: cuerpo }
+    );
+    return verificarEscritura(r);
   }
 
   function guardar() {
@@ -181,10 +191,11 @@ function Habilitadas({
           onPress: async () => {
             setGuardando(true);
             try {
-              await registrar();
+              const r = await registrar();
               Alert.alert(
                 'Guardada',
-                'Tu selección quedó guardada. Todavía podés modificarla; se envía al cerrar la preinscripción.'
+                r.successMessage?.trim() ||
+                  'Tu selección quedó guardada. Todavía podés modificarla; se envía al cerrar la preinscripción.'
               );
               onGuardado();
             } catch (err) {
@@ -206,8 +217,16 @@ function Habilitadas({
       setGuardando(true);
       try {
         await registrar();
-        await apiPostForm(`cerrar-preinscripcion/${codcarsec}?modoPago=${modoPago}`, {});
-        Alert.alert('Preinscripción cerrada', 'Tu preinscripción fue enviada.');
+        const r = verificarEscritura(
+          await apiPostForm<RespuestaEscritura>(
+            `cerrar-preinscripcion/${codcarsec}?modoPago=${modoPago}`,
+            {}
+          )
+        );
+        Alert.alert(
+          'Preinscripción cerrada',
+          r.successMessage?.trim() || 'Tu preinscripción fue enviada.'
+        );
         onGuardado();
       } catch (err) {
         Alert.alert('No se pudo cerrar', mensajeDe(err));
