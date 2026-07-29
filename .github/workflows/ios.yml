@@ -87,8 +87,28 @@ jobs:
         run: |
           set -euo pipefail
           cd ios
+
+          # SDK 57 usa Swift Package Manager: normalmente hay .xcodeproj y no
+          # .xcworkspace. Solo existe workspace si el proyecto trae CocoaPods.
+          if [ -f Podfile ]; then
+            pod install --repo-update
+          fi
+          if compgen -G "*.xcworkspace" > /dev/null; then
+            CONTAINER=(-workspace "$(ls -d *.xcworkspace | head -1)")
+          else
+            CONTAINER=(-project "$(ls -d *.xcodeproj | head -1)")
+          fi
+          echo "Contenedor: ${CONTAINER[*]}"
+
+          # El scheme lo genera prebuild a partir del nombre de la app; leerlo
+          # es más seguro que asumirlo.
+          SCHEME=$(xcodebuild -list -json "${CONTAINER[@]}" \
+            | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log((j.project||j.workspace).schemes[0])})")
+          echo "Scheme detectado: $SCHEME"
+          echo "SCHEME_REAL=$SCHEME" >> "$GITHUB_ENV"
+
           xcodebuild archive \
-            -workspace *.xcworkspace \
+            "${CONTAINER[@]}" \
             -scheme "$SCHEME" \
             -configuration Release \
             -archivePath "$RUNNER_TEMP/app.xcarchive" \
@@ -96,8 +116,7 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
-            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN" \
-            -allowProvisioningUpdates
+            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN"
 
       - name: Exportar IPA
         run: |
