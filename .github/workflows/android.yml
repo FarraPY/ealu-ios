@@ -32,18 +32,21 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generar proyecto Android nativo
+        run: npx expo prebuild --platform android --no-install
+
+      # Va DESPUES del prebuild a proposito: `cache: gradle` arma su clave con el
+      # hash de los archivos .gradle, y antes del prebuild el directorio android/
+      # no existe todavia. Puesto antes, el paso falla con "No file ... matched".
       # React Native 0.86 usa AGP 8, que pide JDK 17.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
-
-      - name: Instalar dependencias
-        run: npm ci
-
-      - name: Generar proyecto Android nativo
-        run: npx expo prebuild --platform android --no-install
 
       - name: Compilar APK de release
         run: |
