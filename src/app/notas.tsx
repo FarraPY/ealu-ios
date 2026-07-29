@@ -12,7 +12,7 @@ import {
   Titulo,
   useColores,
 } from '@/components/base';
-import { DistribucionNotas } from '@/components/distribucion-notas';
+import { ContenidoDistribucion } from '@/components/distribucion-notas';
 import { SelectorMalla } from '@/components/selector-malla';
 import { Peligro, Spacing } from '@/constants/theme';
 import { Extension, NotaFinal, NotasFinales } from '@/lib/api';
@@ -181,20 +181,7 @@ function Finales({ datos }: { datos: NotasFinales | null }) {
         </View>
       ))}
 
-      <DetalleNota
-        nota={detalle}
-        onCerrar={() => setDetalle(null)}
-        onDistribucion={() => {
-          setDistribucion(detalle);
-          setDetalle(null);
-        }}
-      />
-
-      <DistribucionNotas
-        origen={distribucion ? { tipo: 'nota', nota: distribucion } : null}
-        codcarsec={codcarsec}
-        onCerrar={() => setDistribucion(null)}
-      />
+      <DetalleNota nota={detalle} codcarsec={codcarsec} onCerrar={() => setDetalle(null)} />
     </>
   );
 }
@@ -236,12 +223,12 @@ function FilaNota({ nota, onDetalle }: { nota: NotaFinal; onDetalle: () => void 
 
 function DetalleNota({
   nota,
+  codcarsec,
   onCerrar,
-  onDistribucion,
 }: {
   nota: NotaFinal | null;
+  codcarsec: string;
   onCerrar: () => void;
-  onDistribucion: () => void;
 }) {
   const c = useColores();
   if (!nota) return null;
@@ -294,14 +281,9 @@ function DetalleNota({
               ))}
           </Tarjeta>
 
-          <Pressable
-            onPress={onDistribucion}
-            style={[e.orden, { backgroundColor: c.backgroundElement }]}>
-            <Text style={{ color: c.textSecondary, fontSize: 13 }}>Cómo le fue al curso</Text>
-            <Text style={{ color: c.marca, fontSize: 13, fontWeight: '600' }}>
-              Ver distribución
-            </Text>
-          </Pressable>
+          {/* Va acá dentro y no en otro modal: iOS no admite cerrar uno y abrir
+              otro en el mismo instante, y la vista aparecía y se ocultaba sola. */}
+          <ContenidoDistribucion origen={{ tipo: 'nota', nota }} codcarsec={codcarsec} />
         </ScrollView>
       </View>
     </Modal>

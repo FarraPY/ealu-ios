@@ -106,14 +106,18 @@ function promedioDe(notas: string[], porcentajes: number[]): number {
   return peso ? suma / peso : 0;
 }
 
-export function DistribucionNotas({
+/**
+ * Solo el contenido, sin modal. Se usa embebido dentro del detalle del acta:
+ * encadenar dos modales en iOS hace que el segundo aparezca y se oculte solo.
+ */
+export function ContenidoDistribucion({
   origen,
   codcarsec,
-  onCerrar,
+  conEncabezado = false,
 }: {
   origen: OrigenInfo | null;
   codcarsec: string;
-  onCerrar: () => void;
+  conEncabezado?: boolean;
 }) {
   const c = useColores();
   const consulta = useApi<RespuestaInfo>(origen ? rutaDe(origen, codcarsec) : null);
@@ -135,6 +139,86 @@ export function DistribucionNotas({
     .join(' · ');
 
   return (
+    <View style={{ gap: Spacing.two }}>
+      {conEncabezado ? (
+        <>
+          <Text style={{ color: c.text, fontSize: 17, fontWeight: '600' }}>{titulo}</Text>
+          {subtitulo ? (
+            <Text style={{ color: c.textSecondary, fontSize: 13 }}>{subtitulo}</Text>
+          ) : null}
+        </>
+      ) : null}
+
+      {consulta.cargando ? (
+        <Cargando />
+      ) : consulta.error ? (
+        <Aviso texto={consulta.error} />
+      ) : !series.length ? (
+        <Aviso texto="No hay datos de distribución para esta materia." />
+      ) : (
+        <>
+          <Titulo>
+            {series.length > 1 ? 'Cómo califica cada profesor' : 'Cómo le fue al curso'}
+          </Titulo>
+
+          {series.map((s, idx) => (
+            <Tarjeta key={s.nombre ?? idx}>
+              {s.nombre ? (
+                <Text style={{ color: c.text, fontSize: 15, fontWeight: '600' }}>{s.nombre}</Text>
+              ) : null}
+              <Text style={{ color: c.textSecondary, fontSize: 12, marginBottom: Spacing.one }}>
+                {[
+                  s.total !== null ? `${s.total} notas` : null,
+                  `promedio ${promedioDe(s.notas, s.porcentajes).toFixed(2)}`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+
+              {s.notas.map((nota, i) => {
+                const pct = s.porcentajes[i] ?? 0;
+                return (
+                  <View key={nota} style={{ gap: 3 }}>
+                    <View style={e.entre}>
+                      <Text style={{ color: c.text, fontSize: 13 }}>Nota {nota}</Text>
+                      <Text style={{ color: c.textSecondary, fontSize: 12 }}>
+                        {pct.toFixed(1)}%
+                      </Text>
+                    </View>
+                    <View style={[e.riel, { backgroundColor: c.backgroundSelected }]}>
+                      <View
+                        style={[
+                          e.barra,
+                          {
+                            width: `${Math.max(pct, pct > 0 ? 2 : 0)}%`,
+                            backgroundColor: COLOR_NOTA[nota] ?? c.marca,
+                          },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </Tarjeta>
+          ))}
+        </>
+      )}
+    </View>
+  );
+}
+
+/** Versión en modal, para abrir desde la lista de materias inscriptas. */
+export function DistribucionNotas({
+  origen,
+  codcarsec,
+  onCerrar,
+}: {
+  origen: OrigenInfo | null;
+  codcarsec: string;
+  onCerrar: () => void;
+}) {
+  const c = useColores();
+  return (
     <Modal
       visible={!!origen}
       animationType="slide"
@@ -150,69 +234,8 @@ export function DistribucionNotas({
             <Text style={{ color: c.marca, fontSize: 16 }}>Cerrar</Text>
           </Pressable>
         </View>
-
-        <ScrollView contentContainerStyle={{ padding: Spacing.three, gap: Spacing.two }}>
-          <Text style={{ color: c.text, fontSize: 17, fontWeight: '600' }}>{titulo}</Text>
-          {subtitulo ? (
-            <Text style={{ color: c.textSecondary, fontSize: 13 }}>{subtitulo}</Text>
-          ) : null}
-
-          {consulta.cargando ? (
-            <Cargando />
-          ) : consulta.error ? (
-            <Aviso texto={consulta.error} />
-          ) : !series.length ? (
-            <Aviso texto="No hay datos de distribución para esta materia." />
-          ) : (
-            <>
-              <Titulo>
-                {series.length > 1 ? 'Cómo califica cada profesor' : 'Cómo le fue al curso'}
-              </Titulo>
-
-              {series.map((s, idx) => (
-                <Tarjeta key={s.nombre ?? idx}>
-                  {s.nombre ? (
-                    <Text style={{ color: c.text, fontSize: 15, fontWeight: '600' }}>
-                      {s.nombre}
-                    </Text>
-                  ) : null}
-                  <Text style={{ color: c.textSecondary, fontSize: 12, marginBottom: Spacing.one }}>
-                    {[
-                      s.total !== null ? `${s.total} notas` : null,
-                      `promedio ${promedioDe(s.notas, s.porcentajes).toFixed(2)}`,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Text>
-
-                  {s.notas.map((nota, i) => {
-                    const pct = s.porcentajes[i] ?? 0;
-                    return (
-                      <View key={nota} style={{ gap: 3 }}>
-                        <View style={e.entre}>
-                          <Text style={{ color: c.text, fontSize: 13 }}>Nota {nota}</Text>
-                          <Text style={{ color: c.textSecondary, fontSize: 12 }}>
-                            {pct.toFixed(1)}%
-                          </Text>
-                        </View>
-                        <View style={[e.riel, { backgroundColor: c.backgroundSelected }]}>
-                          <View
-                            style={[
-                              e.barra,
-                              {
-                                width: `${Math.max(pct, pct > 0 ? 2 : 0)}%`,
-                                backgroundColor: COLOR_NOTA[nota] ?? c.marca,
-                              },
-                            ]}
-                          />
-                        </View>
-                      </View>
-                    );
-                  })}
-                </Tarjeta>
-              ))}
-            </>
-          )}
+        <ScrollView contentContainerStyle={{ padding: Spacing.three }}>
+          <ContenidoDistribucion origen={origen} codcarsec={codcarsec} conEncabezado />
         </ScrollView>
       </View>
     </Modal>

@@ -12,6 +12,7 @@ import {
   Titulo,
   useColores,
 } from '@/components/base';
+import { ConfirmacionPreinscripcion } from '@/components/confirmacion-preinscripcion';
 import { DistribucionNotas } from '@/components/distribucion-notas';
 import { SelectorMalla } from '@/components/selector-malla';
 import { Spacing } from '@/constants/theme';
@@ -132,6 +133,7 @@ function Habilitadas({
     return inicial;
   });
   const [guardando, setGuardando] = useState(false);
+  const [viendoConfirmacion, setViendoConfirmacion] = useState(false);
 
   // La web separa las materias por semestre; sin eso, las optativas de cursos
   // viejos se mezclan con las del semestre actual y no se distingue cuál es cuál.
@@ -357,6 +359,12 @@ function Habilitadas({
       ))}
 
       <Pressable
+        onPress={() => setViendoConfirmacion(true)}
+        style={[e.boton, { backgroundColor: c.backgroundElement }]}>
+        <Text style={[e.botonTexto, { color: c.text }]}>Ver confirmación</Text>
+      </Pressable>
+
+      <Pressable
         onPress={guardar}
         disabled={guardando}
         style={[e.boton, { backgroundColor: c.backgroundElement, opacity: guardando ? 0.5 : 1 }]}>
@@ -371,6 +379,12 @@ function Habilitadas({
         style={[e.boton, { backgroundColor: c.marca, opacity: guardando ? 0.5 : 1 }]}>
         <Text style={[e.botonTexto, { color: '#fff' }]}>Guardar y cerrar preinscripción</Text>
       </Pressable>
+
+      <ConfirmacionPreinscripcion
+        visible={viendoConfirmacion}
+        codcarsec={codcarsec}
+        onCerrar={() => setViendoConfirmacion(false)}
+      />
     </>
   );
 }
