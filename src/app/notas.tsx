@@ -92,6 +92,7 @@ function Finales({ datos }: { datos: NotasFinales | null }) {
       const alumno = (info?.alumno ?? {}) as Record<string, unknown>;
       await compartirNotasPdf({
         facultad: info?.facultad?.nombreCompleto ?? info?.facultad?.nombre ?? '',
+        codigoFacultad: info?.facultad?.codigo ?? '',
         carrera:
           String(
             matriculas.find((m) => (m.codcarsec ?? '').trim() === codcarsec)?.carrera ?? ''
