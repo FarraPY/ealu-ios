@@ -11,7 +11,14 @@
 name: Compilar IPA iOS
 
 on:
+  # Manual, y además en cada push a main: evita tener que abrir la web para
+  # lanzarlo. Se ignoran los cambios de documentación, que no afectan al IPA.
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'credentials.example.json'
 
 env:
   BUNDLE_ID: app.carrot4037.persimmon1148
