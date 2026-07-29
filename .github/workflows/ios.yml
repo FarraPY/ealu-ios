@@ -107,6 +107,9 @@ jobs:
           echo "Scheme detectado: $SCHEME"
           echo "SCHEME_REAL=$SCHEME" >> "$GITHUB_ENV"
 
+          # Guardar el log completo: xcodebuild entierra el error real entre miles
+          # de líneas de "note:", y la web de Actions las virtualiza.
+          set +e
           xcodebuild archive \
             "${CONTAINER[@]}" \
             -scheme "$SCHEME" \
@@ -116,7 +119,22 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
-            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN"
+            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN" \
+            > "$RUNNER_TEMP/xcodebuild.log" 2>&1
+          STATUS=$?
+          set -e
+
+          if [ $STATUS -ne 0 ]; then
+            echo "::group::=== ERRORES DE COMPILACION ==="
+            grep -nE "error:|ARCHIVE FAILED|The following build commands failed|Command .* failed|No profile|no signing certificate|Signing for" \
+              "$RUNNER_TEMP/xcodebuild.log" | tail -40 || echo "(sin lineas de error reconocibles)"
+            echo "::endgroup::"
+            echo "::group::=== ULTIMAS 60 LINEAS ==="
+            tail -60 "$RUNNER_TEMP/xcodebuild.log"
+            echo "::endgroup::"
+            exit $STATUS
+          fi
+          echo "Archive generado correctamente."
 
       - name: Exportar IPA
         run: |
