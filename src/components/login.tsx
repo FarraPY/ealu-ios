@@ -171,8 +171,13 @@ function SelectorFacultad({
   }, [busqueda, facultades]);
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onCerrar}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onCerrar}
+      onDismiss={onCerrar}>
+      <View style={{ flex: 1, backgroundColor: c.background }}>
         <View style={est.modalCabecera}>
           <Text style={[est.modalTitulo, { color: c.text }]}>Facultad</Text>
           <Pressable onPress={onCerrar} hitSlop={12}>
@@ -196,7 +201,7 @@ function SelectorFacultad({
           data={filtradas}
           keyExtractor={(f) => String(f.id)}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: Spacing.three, gap: Spacing.one }}
+          contentContainerStyle={{ padding: Spacing.three, gap: Spacing.two }}
           renderItem={({ item }) => (
             <Pressable
               onPress={() => onElegir(item)}
@@ -208,7 +213,7 @@ function SelectorFacultad({
             </Pressable>
           )}
         />
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

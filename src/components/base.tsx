@@ -83,6 +83,23 @@ export function Aviso({ texto }: { texto: string }) {
   );
 }
 
+/** Error con acción: sin esto hay que cambiar de pestaña para volver a intentar. */
+export function AvisoError({ texto, onReintentar }: { texto: string; onReintentar?: () => void }) {
+  const c = useColores();
+  return (
+    <Tarjeta>
+      <Text style={{ color: c.textSecondary, fontSize: 15, lineHeight: 21 }}>{texto}</Text>
+      {onReintentar ? (
+        <Pressable
+          onPress={onReintentar}
+          style={[estilos.reintentar, { backgroundColor: c.backgroundSelected }]}>
+          <Text style={{ color: c.marca, fontSize: 15, fontWeight: '600' }}>Reintentar</Text>
+        </Pressable>
+      ) : null}
+    </Tarjeta>
+  );
+}
+
 // ------------------------------------------------------------------- segmentos
 
 export function Segmentos<T extends string>({
@@ -225,19 +242,27 @@ export function ListaDatos({ datos, vacio }: { datos: unknown; vacio: string }) 
 
 
 const estilos = StyleSheet.create({
-  contenido: { padding: Spacing.three, paddingBottom: Spacing.six, gap: Spacing.two },
+  // gap de 12 entre tarjetas: con 8 quedaban visualmente pegadas.
+  contenido: { padding: Spacing.three, paddingBottom: Spacing.six, gap: 12 },
   centro: { paddingVertical: Spacing.five, alignItems: 'center' },
   titulo: {
     fontSize: 13,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    marginTop: Spacing.three,
-    marginBottom: Spacing.one,
+    marginTop: Spacing.four,
+    marginBottom: Spacing.two,
     marginLeft: Spacing.one,
   },
-  tarjeta: { borderRadius: 14, padding: Spacing.three, gap: Spacing.two },
+  tarjeta: { borderRadius: 14, paddingVertical: 14, paddingHorizontal: Spacing.three, gap: Spacing.two },
   tituloTarjeta: { fontSize: 16, fontWeight: '600', marginBottom: Spacing.half },
+  reintentar: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: 8,
+    marginTop: Spacing.one,
+  },
   segmentos: { flexDirection: 'row', borderRadius: 10, padding: 3, gap: 3, marginBottom: Spacing.two },
   segmento: { flex: 1, paddingVertical: Spacing.two, borderRadius: 8, alignItems: 'center' },
   fila: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three },

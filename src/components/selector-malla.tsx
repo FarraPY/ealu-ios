@@ -9,7 +9,6 @@
  */
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useColores } from '@/components/base';
 import { Spacing } from '@/constants/theme';
@@ -39,8 +38,13 @@ export function SelectorMalla() {
         <Text style={{ color: c.marca, fontSize: 13, fontWeight: '600' }}>Cambiar</Text>
       </Pressable>
 
-      <Modal visible={abierto} animationType="slide" onRequestClose={() => setAbierto(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
+      <Modal
+        visible={abierto}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setAbierto(false)}
+        onDismiss={() => setAbierto(false)}>
+        <View style={{ flex: 1, backgroundColor: c.background }}>
           <View style={e.cabecera}>
             <Text style={{ color: c.text, fontSize: 22, fontWeight: '700' }}>Malla curricular</Text>
             <Pressable onPress={() => setAbierto(false)} hitSlop={12}>
@@ -85,7 +89,7 @@ export function SelectorMalla() {
               );
             })}
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
     </>
   );

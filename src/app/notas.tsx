@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   Aviso,
+  AvisoError,
   Cargando,
   ListaDatos,
   Pantalla,
@@ -58,7 +58,7 @@ export default function Notas() {
       {consulta.cargando ? (
         <Cargando />
       ) : consulta.error ? (
-        <Aviso texto={consulta.error} />
+        <AvisoError texto={consulta.error} onReintentar={consulta.recargar} />
       ) : vista === 'Finales' ? (
         <Finales datos={consulta.datos as NotasFinales | null} />
       ) : vista === 'Firmas' ? (
@@ -118,8 +118,10 @@ function Finales({ datos }: { datos: NotasFinales | null }) {
         </Text>
       </Pressable>
 
+      {/* El gap va en cada grupo: el del ScrollView solo separa los grupos entre
+          sí, no las tarjetas de adentro. */}
       {porCurso.map(([codcurso, grupo]) => (
-        <View key={codcurso}>
+        <View key={codcurso} style={{ gap: 12 }}>
           <Titulo>{grupo.titulo}</Titulo>
           {grupo.notas.map((n, i) => (
             <FilaNota key={`${n.codasign}-${i}`} nota={n} onDetalle={() => setDetalle(n)} />
@@ -185,8 +187,16 @@ function DetalleNota({ nota, onCerrar }: { nota: NotaFinal | null; onCerrar: () 
   ];
 
   return (
-    <Modal visible animationType="slide" onRequestClose={onCerrar}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
+    // pageSheet: hoja modal nativa de iOS. Deja libre la barra de estado (el
+    // SafeAreaView de adentro no recibe insets porque el Modal se monta fuera
+    // del SafeAreaProvider) y habilita el gesto de arrastrar para cerrar.
+    <Modal
+      visible
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onCerrar}
+      onDismiss={onCerrar}>
+      <View style={{ flex: 1, backgroundColor: c.background }}>
         <View style={e.modalCabecera}>
           <Text style={{ color: c.text, fontSize: 20, fontWeight: '700', flex: 1 }}>
             Detalle del acta
@@ -211,7 +221,7 @@ function DetalleNota({ nota, onCerrar }: { nota: NotaFinal | null; onCerrar: () 
               ))}
           </Tarjeta>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
@@ -355,11 +365,11 @@ const e = StyleSheet.create({
     paddingVertical: Spacing.two,
     marginTop: Spacing.two,
   },
-  filaNota: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  notaCaja: { width: 34, alignItems: 'center' },
+  filaNota: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  notaCaja: { width: 32, alignItems: 'center' },
   notaValor: { fontSize: 26, fontWeight: '700' },
-  filaTexto: { flex: 1, gap: 2 },
-  asignatura: { fontSize: 15, fontWeight: '600' },
+  filaTexto: { flex: 1, gap: 4 },
+  asignatura: { fontSize: 15, fontWeight: '600', lineHeight: 20 },
   metricas: { flexDirection: 'row', gap: Spacing.five, marginTop: Spacing.two },
   modalCabecera: {
     flexDirection: 'row',

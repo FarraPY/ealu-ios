@@ -57,11 +57,16 @@ export function CambiarContrasena({ visible, onCerrar }: { visible: boolean; onC
     <Modal
       visible={visible}
       animationType="slide"
+      presentationStyle="pageSheet"
       onRequestClose={() => {
         limpiar();
         onCerrar();
+      }}
+      onDismiss={() => {
+        limpiar();
+        onCerrar();
       }}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
+      <View style={{ flex: 1, backgroundColor: c.background }}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -117,7 +122,7 @@ export function CambiarContrasena({ visible, onCerrar }: { visible: boolean; onC
             </Text>
           </ScrollView>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

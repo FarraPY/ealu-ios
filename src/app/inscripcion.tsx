@@ -3,6 +3,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   Aviso,
+  AvisoError,
   Cargando,
   ListaDatos,
   Pantalla,
@@ -47,7 +48,7 @@ export default function InscripcionScreen() {
       {consulta.cargando ? (
         <Cargando />
       ) : consulta.error ? (
-        <Aviso texto={consulta.error} />
+        <AvisoError texto={consulta.error} onReintentar={consulta.recargar} />
       ) : ambito === 'Materias' && vista === 'Disponibles' ? (
         <Habilitadas
           respuesta={(consulta.datos as RespuestaHabilitadas) ?? {}}
@@ -264,7 +265,7 @@ function Habilitadas({
       </Text>
 
       {gruposPorCurso.map(([curso, lista]) => (
-        <View key={curso}>
+        <View key={curso} style={{ gap: 12 }}>
           <Titulo>{curso}</Titulo>
           {lista.map((a) => {
             const seleccionada = !!elegidas[a.codasign];
@@ -380,7 +381,7 @@ function PorSemestre({ materias }: { materias: Inscripcion[] }) {
   return (
     <>
       {grupos.map(([titulo, g]) => (
-        <View key={titulo}>
+        <View key={titulo} style={{ gap: 12 }}>
           <Titulo>{titulo}</Titulo>
           {g.materias.map((m, i) => (
             <FilaMateria key={i} materia={m} />

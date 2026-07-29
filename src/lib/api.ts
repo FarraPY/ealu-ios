@@ -109,7 +109,8 @@ async function pedir(
   path: string,
   init: RequestInit,
   reintentar: boolean,
-  esperaJson = true
+  esperaJson = true,
+  intento = 0
 ): Promise<Response> {
   let res: Response;
   try {
@@ -119,6 +120,14 @@ async function pedir(
     });
   } catch {
     throw new ApiError('Sin conexión con el servidor de la UNA.');
+  }
+
+  // El backend devuelve 500 de forma intermitente y a la siguiente llamada anda.
+  // Se reintenta solo en lecturas: repetir un POST podría duplicar una escritura.
+  const esLectura = !init.method || init.method === 'GET';
+  if (res.status >= 500 && esLectura && intento < 2) {
+    await new Promise((r) => setTimeout(r, 600 * (intento + 1)));
+    return pedir(path, init, reintentar, esperaJson, intento + 1);
   }
 
   const tipo = res.headers.get('content-type') ?? '';
@@ -136,7 +145,14 @@ async function pedir(
     throw new ApiError('Tu sesión expiró. Iniciá sesión de nuevo.', 401);
   }
 
-  if (!res.ok) throw new ApiError(`El servidor respondió ${res.status}.`, res.status);
+  if (!res.ok) {
+    throw new ApiError(
+      res.status >= 500
+        ? 'El servidor de la UNA no está respondiendo bien en este momento.'
+        : `El servidor respondió ${res.status}.`,
+      res.status
+    );
+  }
   return res;
 }
 

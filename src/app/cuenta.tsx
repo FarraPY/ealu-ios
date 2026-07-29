@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import {
   Aviso,
+  AvisoError,
   Cargando,
   ListaDatos,
   Pantalla,
@@ -56,7 +57,7 @@ export default function Cuenta() {
         deudas.cargando ? (
           <Cargando />
         ) : deudas.error ? (
-          <Aviso texto={deudas.error} />
+          <AvisoError texto={deudas.error} onReintentar={deudas.recargar} />
         ) : !deudas.datos?.length ? (
           <Aviso texto="No tenés deudas pendientes." />
         ) : (

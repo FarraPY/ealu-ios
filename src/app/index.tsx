@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Aviso, Cargando, Pantalla, Tarjeta, Titulo, useColores } from '@/components/base';
+import { Aviso, AvisoError, Cargando, Pantalla, Tarjeta, Titulo, useColores } from '@/components/base';
 import { SelectorMalla } from '@/components/selector-malla';
 import { Peligro, Spacing } from '@/constants/theme';
 import { NotasFinales, UltimaNota } from '@/lib/api';
@@ -53,7 +53,7 @@ export default function Inicio() {
       {ultimas.cargando ? (
         <Cargando />
       ) : ultimas.error ? (
-        <Aviso texto={ultimas.error} />
+        <AvisoError texto={ultimas.error} onReintentar={ultimas.recargar} />
       ) : !ultimas.datos?.length ? (
         <Aviso texto="No hay notas cargadas en los últimos 30 días. Las notas aparecen cuando la cátedra las sube al sistema." />
       ) : (

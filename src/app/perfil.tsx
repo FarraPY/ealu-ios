@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Aviso, Cargando, Pantalla, Segmentos, Tarjeta, Titulo, useColores } from '@/components/base';
+import {
+  Aviso,
+  AvisoError,
+  Cargando,
+  Pantalla,
+  Segmentos,
+  Tarjeta,
+  Titulo,
+  useColores,
+} from '@/components/base';
 import { CambiarContrasena } from '@/components/cambiar-contrasena';
 import { SelectorMalla } from '@/components/selector-malla';
 import { ListaDatos } from '@/components/base';
@@ -54,7 +63,7 @@ export default function PerfilScreen() {
         perfil.cargando ? (
           <Cargando />
         ) : perfil.error ? (
-          <Aviso texto={perfil.error} />
+          <AvisoError texto={perfil.error} onReintentar={perfil.recargar} />
         ) : (
           <Tarjeta>
             {CAMPOS.map(([clave, etiqueta]) => {
