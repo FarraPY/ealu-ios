@@ -59,8 +59,48 @@ src/app/                  5 pestañas: Inicio, Notas, Inscripción, Cuenta, Perf
 
 ## Compilar e instalar (desde Windows, sin Mac)
 
-La compilación ocurre en los servidores de Expo: no hace falta macOS ni Xcode. Hay dos vías
-según cómo se firme.
+**La vía que funciona es GitHub Actions** (`.github/workflows/ios.yml`), no EAS Build. Ver
+"Por qué GitHub Actions y no EAS" más abajo.
+
+```
+Actions > Compilar IPA iOS > Run workflow  ->  artefacto "ealu-ipa" (~14 MB)
+```
+
+Necesita tres secrets en el repositorio (`Settings > Secrets and variables > Actions`):
+`IOS_P12_BASE64`, `IOS_PROFILE_BASE64` e `IOS_P12_PASSWORD`. Los dos primeros se generan con:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("certs\certificado.p12")) | Set-Clipboard
+```
+
+Cuatro cosas que costaron un build cada una, por si hay que rehacer el workflow:
+
+1. SDK 57 usa CocoaPods: hay `.xcworkspace` **después** de `pod install`, no antes.
+2. El certificado es `Apple Distribution`; sin `CODE_SIGN_IDENTITY="Apple Distribution"`
+   Xcode busca uno de tipo *iOS Development* y falla.
+3. Las dependencias Swift Package Manager conviene resolverlas en un paso aparte.
+4. Hace falta **Xcode 26** (Swift 6.2). En `macos-15` (Xcode 16.4 / Swift 6.1) falla con
+   `package 'apple' is using Swift tools version 6.2.0`. Por eso `runs-on: macos-26`.
+
+### Por qué GitHub Actions y no EAS
+
+EAS Build falla en la fase *Prepare credentials* con este certificado:
+
+```
+Distribution certificate with fingerprint ... hasn't been imported successfully
+```
+
+No es problema del certificado. Se verificó que el par clave/certificado coincide (mismo
+módulo), que el fingerprint es idéntico al del perfil, que no está revocado (OCSP responde
+`good`) y —sobre todo— que **macOS lo importa sin problemas**: en el runner de GitHub,
+`security find-identity` lo lista como identidad válida y firma correctamente. Es una
+validación interna de EAS la que lo rechaza.
+
+Reempaquetar el `.p12` con AES-256 y agregarle la cadena WWDR no cambió nada en EAS.
+
+---
+
+Lo que sigue queda como referencia histórica de las vías con EAS.
 
 ### A. Certificado propio ad-hoc (la vía que usa este proyecto)
 
