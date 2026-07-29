@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Aviso, AvisoError, Cargando, Pantalla, Tarjeta, Titulo, useColores } from '@/components/base';
@@ -26,6 +27,26 @@ export default function Inicio() {
     deuda.recargar();
   };
 
+  /**
+   * Materias efectivamente aprobadas.
+   *
+   * `notas` trae un acta por rendición, no una por materia: incluye los aplazos
+   * (nota 1 en la escala 1A5), repite la materia cuando se rindió más de una vez,
+   * y suma un registro de Extensión Universitaria que no es una asignatura sino
+   * un requisito de egreso. Contar el largo del arreglo infla el número.
+   */
+  const aprobadas = useMemo(() => {
+    const notas = finales.datos?.notas ?? [];
+    const distintas = new Set(
+      notas
+        .filter((n) => n.codescala?.trim().toUpperCase() !== 'EXT')
+        .filter((n) => n.valornota >= 2)
+        .map((n) => n.codasign?.trim())
+        .filter(Boolean)
+    );
+    return distintas.size;
+  }, [finales.datos]);
+
   return (
     <Pantalla refrescando={ultimas.refrescando} onRefresh={recargar}>
       <Text style={[e.nombre, { color: c.text }]}>{nombre}</Text>
@@ -42,7 +63,7 @@ export default function Inicio() {
           etiqueta="Promedio"
         />
         <Metrica
-          valor={finales.datos ? String(finales.datos.notas.length) : '—'}
+          valor={finales.datos ? String(aprobadas) : '—'}
           etiqueta="Materias aprobadas"
         />
       </View>
