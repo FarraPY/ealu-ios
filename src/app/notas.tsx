@@ -81,6 +81,18 @@ function Finales({ datos }: { datos: NotasFinales | null }) {
   const [recientesPrimero, setRecientesPrimero] = useState(true);
   const [detalle, setDetalle] = useState<NotaFinal | null>(null);
 
+  /**
+   * Materias que entran en el promedio.
+   *
+   * El promedio se calcula sobre todas las notas numéricas, aplazos incluidos,
+   * así que este número NO son "aprobadas". Se descarta Extensión Universitaria:
+   * usa la escala EXT (COMPLETO/INCOMPLETO), no va del 1 al 5 y no promedia.
+   */
+  const conNota = useMemo(
+    () => notas.filter((n) => n.codescala?.trim().toUpperCase() !== 'EXT').length,
+    [notas]
+  );
+
   const porCurso = useMemo(() => {
     const mapa = new Map<number, { titulo: string; notas: NotaFinal[] }>();
     for (const n of notas) {
@@ -102,7 +114,7 @@ function Finales({ datos }: { datos: NotasFinales | null }) {
           <View>
             <Text style={{ color: c.textSecondary, fontSize: 14 }}>Promedio general</Text>
             <Text style={{ color: c.textSecondary, fontSize: 12 }}>
-              {notas.length} materias aprobadas
+              Sobre {conNota} materias
             </Text>
           </View>
           <Text style={[e.promedio, { color: c.text }]}>{(datos?.promedio ?? 0).toFixed(2)}</Text>
