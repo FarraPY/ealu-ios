@@ -12,6 +12,7 @@ import {
   Titulo,
   useColores,
 } from '@/components/base';
+import { DistribucionNotas } from '@/components/distribucion-notas';
 import { SelectorMalla } from '@/components/selector-malla';
 import { Peligro, Spacing } from '@/constants/theme';
 import { Extension, NotaFinal, NotasFinales } from '@/lib/api';
@@ -82,6 +83,7 @@ function Finales({ datos }: { datos: NotasFinales | null }) {
   // Por defecto los semestres más recientes primero: es lo que se consulta.
   const [recientesPrimero, setRecientesPrimero] = useState(true);
   const [detalle, setDetalle] = useState<NotaFinal | null>(null);
+  const [distribucion, setDistribucion] = useState<NotaFinal | null>(null);
   const [generando, setGenerando] = useState(false);
 
   async function exportarPdf() {
@@ -179,7 +181,20 @@ function Finales({ datos }: { datos: NotasFinales | null }) {
         </View>
       ))}
 
-      <DetalleNota nota={detalle} onCerrar={() => setDetalle(null)} />
+      <DetalleNota
+        nota={detalle}
+        onCerrar={() => setDetalle(null)}
+        onDistribucion={() => {
+          setDistribucion(detalle);
+          setDetalle(null);
+        }}
+      />
+
+      <DistribucionNotas
+        origen={distribucion ? { tipo: 'nota', nota: distribucion } : null}
+        codcarsec={codcarsec}
+        onCerrar={() => setDistribucion(null)}
+      />
     </>
   );
 }
@@ -219,7 +234,15 @@ function FilaNota({ nota, onDetalle }: { nota: NotaFinal; onDetalle: () => void 
   );
 }
 
-function DetalleNota({ nota, onCerrar }: { nota: NotaFinal | null; onCerrar: () => void }) {
+function DetalleNota({
+  nota,
+  onCerrar,
+  onDistribucion,
+}: {
+  nota: NotaFinal | null;
+  onCerrar: () => void;
+  onDistribucion: () => void;
+}) {
   const c = useColores();
   if (!nota) return null;
 
@@ -270,6 +293,15 @@ function DetalleNota({ nota, onCerrar }: { nota: NotaFinal | null; onCerrar: () 
                 </View>
               ))}
           </Tarjeta>
+
+          <Pressable
+            onPress={onDistribucion}
+            style={[e.orden, { backgroundColor: c.backgroundElement }]}>
+            <Text style={{ color: c.textSecondary, fontSize: 13 }}>Cómo le fue al curso</Text>
+            <Text style={{ color: c.marca, fontSize: 13, fontWeight: '600' }}>
+              Ver distribución
+            </Text>
+          </Pressable>
         </ScrollView>
       </View>
     </Modal>

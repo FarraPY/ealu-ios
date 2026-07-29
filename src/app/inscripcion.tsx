@@ -393,7 +393,7 @@ function PorSemestre({ materias, codcarsec }: { materias: Inscripcion[]; codcars
       ))}
 
       <DistribucionNotas
-        materia={detalle}
+        origen={detalle ? { tipo: 'inscripcion', materia: detalle } : null}
         codcarsec={codcarsec}
         onCerrar={() => setDetalle(null)}
       />

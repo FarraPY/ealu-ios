@@ -1,19 +1,26 @@
 /**
- * Distribución de notas de una materia — equivale a "más info" en la web.
+ * "Más info" de una materia. La web tiene dos versiones y acá se unifican:
  *
- * Necesita turno, sección y convocatoria, que solo vienen en las inscripciones
- * (no en `notas_finales`), así que se abre desde la pestaña Inscripción.
- * Se dibuja con barras en vez de la torta de la web: en pantalla chica los
- * porcentajes de una torta son ilegibles y las barras se comparan mejor.
+ * - Desde Calificaciones/Finales usa `infoexafinal` (4 parámetros) y devuelve
+ *   PORCENTAJES ya calculados por nota. La web lo dibuja como torta.
+ * - Desde Inscripciones/Preinscripciones usa `infoasignatura` (7 parámetros) y
+ *   devuelve CANTIDADES por nota y por profesor. La web lo dibuja como barras.
+ *
+ * Las dos se muestran con barras horizontales: en pantalla chica una torta con
+ * cinco porciones es ilegible, y las barras permiten comparar profesores.
  */
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Aviso, Cargando, Tarjeta, Titulo, useColores } from '@/components/base';
 import { Spacing } from '@/constants/theme';
-import { InfoAsignatura, Inscripcion } from '@/lib/api';
+import { Inscripcion, NotaFinal } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 
-/** Color por nota: rojo para el aplazo, verde para el 5, como en la web. */
+export type OrigenInfo =
+  | { tipo: 'inscripcion'; materia: Inscripcion }
+  | { tipo: 'nota'; nota: NotaFinal };
+
+/** Color por nota: rojo el aplazo, verde el 5, como en la web. */
 const COLOR_NOTA: Record<string, string> = {
   '1': '#e5484d',
   '2': '#f76b15',
@@ -22,40 +29,114 @@ const COLOR_NOTA: Record<string, string> = {
   '5': '#46a758',
 };
 
+type Serie = { nombre: string | null; notas: string[]; porcentajes: number[]; total: number | null };
+
+type RespuestaInfo = {
+  // infoasignatura
+  chartData?: { data: number[][]; notas: string[]; labels: string[] } | null;
+  // infoexafinal
+  data?: number[];
+  labels?: string[];
+  infoasig?: Record<string, unknown> | null;
+};
+
+function rutaDe(origen: OrigenInfo, codcarsec: string): string {
+  if (origen.tipo === 'nota') {
+    const n = origen.nota;
+    return (
+      `infoexafinal?codcarsec=${encodeURIComponent(codcarsec)}` +
+      `&codasign=${encodeURIComponent((n.codasign ?? '').trim())}` +
+      `&anho=${n.anho ?? ''}` +
+      `&codnota=${n.valornota ?? ''}`
+    );
+  }
+  const m = origen.materia;
+  return (
+    `infoasignatura?codcarsec=${encodeURIComponent(codcarsec)}` +
+    `&codcurso=${m.codcurso ?? ''}` +
+    `&codasign=${encodeURIComponent((m.codasign ?? '').trim())}` +
+    `&anho=${m.anho ?? ''}` +
+    `&convocatoria=${m.convocatoria ?? ''}` +
+    `&turno=${encodeURIComponent((m.turno ?? '').trim())}` +
+    `&seccion=${encodeURIComponent((m.seccion ?? '').trim())}`
+  );
+}
+
+/** Normaliza las dos formas de respuesta a una lista de series comparables. */
+function seriesDe(r: RespuestaInfo | null): Serie[] {
+  if (!r) return [];
+
+  // infoexafinal: porcentajes planos, una sola serie sin profesor.
+  if (Array.isArray(r.data) && Array.isArray(r.labels) && typeof r.data[0] === 'number') {
+    return [
+      {
+        nombre: null,
+        notas: r.labels.map((s) => String(s).trim()),
+        porcentajes: r.data as number[],
+        total: null,
+      },
+    ];
+  }
+
+  // infoasignatura: cantidades por nota (filas) y por profesor (columnas).
+  const chart = r.chartData;
+  if (!chart?.notas?.length) return [];
+  const notas = chart.notas.map((s) => String(s).trim());
+  return (chart.labels ?? []).map((nombre, j) => {
+    const cant = notas.map((_, i) => chart.data?.[i]?.[j] ?? 0);
+    const total = cant.reduce((s, v) => s + v, 0);
+    return {
+      nombre: String(nombre ?? '').trim() || 'Sin profesor',
+      notas,
+      porcentajes: cant.map((v) => (total ? (v / total) * 100 : 0)),
+      total,
+    };
+  });
+}
+
+function promedioDe(notas: string[], porcentajes: number[]): number {
+  let suma = 0;
+  let peso = 0;
+  notas.forEach((etiqueta, i) => {
+    const valor = Number(etiqueta);
+    if (!Number.isFinite(valor)) return;
+    suma += valor * porcentajes[i];
+    peso += porcentajes[i];
+  });
+  return peso ? suma / peso : 0;
+}
+
 export function DistribucionNotas({
-  materia,
+  origen,
   codcarsec,
   onCerrar,
 }: {
-  materia: Inscripcion | null;
+  origen: OrigenInfo | null;
   codcarsec: string;
   onCerrar: () => void;
 }) {
   const c = useColores();
+  const consulta = useApi<RespuestaInfo>(origen ? rutaDe(origen, codcarsec) : null);
 
-  const ruta = materia
-    ? `infoasignatura?codcarsec=${encodeURIComponent(codcarsec)}` +
-      `&codcurso=${materia.codcurso ?? ''}` +
-      `&codasign=${encodeURIComponent((materia.codasign ?? '').trim())}` +
-      `&anho=${materia.anho ?? ''}` +
-      `&convocatoria=${materia.convocatoria ?? ''}` +
-      `&turno=${encodeURIComponent((materia.turno ?? '').trim())}` +
-      `&seccion=${encodeURIComponent((materia.seccion ?? '').trim())}`
-    : null;
+  const series = seriesDe(consulta.datos);
+  const info = (consulta.datos?.infoasig ?? {}) as Record<string, unknown>;
+  const titulo =
+    origen?.tipo === 'nota'
+      ? origen.nota.descripasign?.trim()
+      : origen?.materia.asignatura?.trim();
 
-  const consulta = useApi<InfoAsignatura>(ruta);
-  const chart = consulta.datos?.chartData;
-  const info = consulta.datos?.infoasig;
-
-  // `data` trae un arreglo de cantidades por profesor; se suman todos.
-  const totalPorNota = (chart?.notas ?? []).map((_, i) =>
-    (chart?.data?.[i] ?? []).reduce((s, v) => s + (v ?? 0), 0)
-  );
-  const total = totalPorNota.reduce((s, v) => s + v, 0);
+  const subtitulo = [
+    info.anho,
+    (info.turnodescrip as string)?.trim() || (info.turno as string)?.trim(),
+    (info.seccion as string)?.trim() ? `Sección ${String(info.seccion).trim()}` : null,
+    info.convocatoria ? `Convocatoria ${info.convocatoria}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <Modal
-      visible={!!materia}
+      visible={!!origen}
       animationType="slide"
       presentationStyle="pageSheet"
       onRequestClose={onCerrar}
@@ -71,77 +152,65 @@ export function DistribucionNotas({
         </View>
 
         <ScrollView contentContainerStyle={{ padding: Spacing.three, gap: Spacing.two }}>
-          <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>
-            {materia?.asignatura?.trim()}
-          </Text>
-          {info ? (
-            <Text style={{ color: c.textSecondary, fontSize: 13 }}>
-              {[
-                info.anho,
-                info.turnodescrip?.trim() || info.turno?.trim(),
-                info.seccion?.trim() ? `Sección ${info.seccion.trim()}` : null,
-                info.convocatoria ? `Convocatoria ${info.convocatoria}` : null,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </Text>
+          <Text style={{ color: c.text, fontSize: 17, fontWeight: '600' }}>{titulo}</Text>
+          {subtitulo ? (
+            <Text style={{ color: c.textSecondary, fontSize: 13 }}>{subtitulo}</Text>
           ) : null}
 
           {consulta.cargando ? (
             <Cargando />
           ) : consulta.error ? (
             <Aviso texto={consulta.error} />
-          ) : !total ? (
-            <Aviso texto="No hay notas registradas para esta materia en ese período." />
+          ) : !series.length ? (
+            <Aviso texto="No hay datos de distribución para esta materia." />
           ) : (
             <>
-              {chart?.labels?.length ? (
-                <>
-                  <Titulo>{chart.labels.length > 1 ? 'Profesores' : 'Profesor'}</Titulo>
-                  <Tarjeta>
-                    {chart.labels.map((p) => (
-                      <Text key={p} style={{ color: c.text, fontSize: 15 }}>
-                        {p?.trim()}
-                      </Text>
-                    ))}
-                  </Tarjeta>
-                </>
-              ) : null}
+              <Titulo>
+                {series.length > 1 ? 'Cómo califica cada profesor' : 'Cómo le fue al curso'}
+              </Titulo>
 
-              <Titulo>Cómo le fue al curso</Titulo>
-              <Tarjeta>
-                {(chart?.notas ?? []).map((nota, i) => {
-                  const cant = totalPorNota[i];
-                  const pct = (cant / total) * 100;
-                  const clave = nota?.trim() ?? '';
-                  return (
-                    <View key={clave} style={{ gap: 4 }}>
-                      <View style={e.entre}>
-                        <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>
-                          Nota {clave}
-                        </Text>
-                        <Text style={{ color: c.textSecondary, fontSize: 13 }}>
-                          {cant} · {pct.toFixed(1)}%
-                        </Text>
+              {series.map((s, idx) => (
+                <Tarjeta key={s.nombre ?? idx}>
+                  {s.nombre ? (
+                    <Text style={{ color: c.text, fontSize: 15, fontWeight: '600' }}>
+                      {s.nombre}
+                    </Text>
+                  ) : null}
+                  <Text style={{ color: c.textSecondary, fontSize: 12, marginBottom: Spacing.one }}>
+                    {[
+                      s.total !== null ? `${s.total} notas` : null,
+                      `promedio ${promedioDe(s.notas, s.porcentajes).toFixed(2)}`,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Text>
+
+                  {s.notas.map((nota, i) => {
+                    const pct = s.porcentajes[i] ?? 0;
+                    return (
+                      <View key={nota} style={{ gap: 3 }}>
+                        <View style={e.entre}>
+                          <Text style={{ color: c.text, fontSize: 13 }}>Nota {nota}</Text>
+                          <Text style={{ color: c.textSecondary, fontSize: 12 }}>
+                            {pct.toFixed(1)}%
+                          </Text>
+                        </View>
+                        <View style={[e.riel, { backgroundColor: c.backgroundSelected }]}>
+                          <View
+                            style={[
+                              e.barra,
+                              {
+                                width: `${Math.max(pct, pct > 0 ? 2 : 0)}%`,
+                                backgroundColor: COLOR_NOTA[nota] ?? c.marca,
+                              },
+                            ]}
+                          />
+                        </View>
                       </View>
-                      <View style={[e.riel, { backgroundColor: c.backgroundSelected }]}>
-                        <View
-                          style={[
-                            e.barra,
-                            {
-                              width: `${Math.max(pct, 1)}%`,
-                              backgroundColor: COLOR_NOTA[clave] ?? c.marca,
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  );
-                })}
-                <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: Spacing.one }}>
-                  {total} notas registradas
-                </Text>
-              </Tarjeta>
+                    );
+                  })}
+                </Tarjeta>
+              ))}
             </>
           )}
         </ScrollView>
