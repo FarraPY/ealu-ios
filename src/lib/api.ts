@@ -341,6 +341,30 @@ export type NotaFinal = {
   nroacta: string | null;
   codescala: string | null;
   observacion: string | null;
+  fechaExaDMY: string | null;
+  puntajeef: number | null;
+};
+
+// ------------------------------------------------- distribución de notas (info)
+
+export type InfoAsignatura = {
+  chartData: {
+    /** Cantidad de alumnos por nota; un arreglo por profesor. */
+    data: number[][];
+    /** Etiquetas de nota, en el mismo orden que `data`. */
+    notas: string[];
+    /** Nombre de cada profesor. */
+    labels: string[];
+  } | null;
+  infoasig: {
+    asignatura: string;
+    anho: number;
+    turno: string;
+    turnodescrip: string;
+    seccion: string;
+    convocatoria: number;
+    profesor: string;
+  } | null;
 };
 
 export type NotasFinales = { notas: NotaFinal[]; promedio: number };
@@ -384,10 +408,12 @@ export type Extension = {
 
 export type Inscripcion = {
   asignatura: string;
+  codasign: string;
   curso: string;
   codcurso: number | null;
   turno: string | null;
   seccion: string | null;
+  convocatoria: number | null;
   anho: number;
   aprobado: unknown;
   porcasis: number | null;

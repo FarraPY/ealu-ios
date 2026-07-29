@@ -12,6 +12,7 @@ import {
   Titulo,
   useColores,
 } from '@/components/base';
+import { DistribucionNotas } from '@/components/distribucion-notas';
 import { SelectorMalla } from '@/components/selector-malla';
 import { Spacing } from '@/constants/theme';
 import {
@@ -56,7 +57,7 @@ export default function InscripcionScreen() {
           onGuardado={consulta.recargar}
         />
       ) : Array.isArray(datos) && datos.length && vista !== 'Horarios' ? (
-        <PorSemestre materias={datos as Inscripcion[]} />
+        <PorSemestre materias={datos as Inscripcion[]} codcarsec={codcarsec} />
       ) : (
         <ListaDatos datos={datos} vacio={vacioDe(ambito, vista)} />
       )}
@@ -365,7 +366,7 @@ function mensajeDe(err: unknown): string {
  * Agrupa por semestre igual que Calificaciones. Sin esto, una lista de 18 materias
  * de años distintos es imposible de leer de un vistazo.
  */
-function PorSemestre({ materias }: { materias: Inscripcion[] }) {
+function PorSemestre({ materias, codcarsec }: { materias: Inscripcion[]; codcarsec: string }) {
   const grupos = useMemo(() => {
     const mapa = new Map<string, { orden: number; materias: Inscripcion[] }>();
     for (const m of materias) {
@@ -378,21 +379,35 @@ function PorSemestre({ materias }: { materias: Inscripcion[] }) {
     return [...mapa.entries()].sort((a, b) => b[1].orden - a[1].orden);
   }, [materias]);
 
+  const [detalle, setDetalle] = useState<Inscripcion | null>(null);
+
   return (
     <>
       {grupos.map(([titulo, g]) => (
         <View key={titulo} style={{ gap: 12 }}>
           <Titulo>{titulo}</Titulo>
           {g.materias.map((m, i) => (
-            <FilaMateria key={i} materia={m} />
+            <FilaMateria key={i} materia={m} onDetalle={() => setDetalle(m)} />
           ))}
         </View>
       ))}
+
+      <DistribucionNotas
+        materia={detalle}
+        codcarsec={codcarsec}
+        onCerrar={() => setDetalle(null)}
+      />
     </>
   );
 }
 
-function FilaMateria({ materia }: { materia: Inscripcion }) {
+function FilaMateria({
+  materia,
+  onDetalle,
+}: {
+  materia: Inscripcion;
+  onDetalle?: () => void;
+}) {
   const c = useColores();
   const detalles = [
     materia.curso?.trim(),
@@ -403,17 +418,24 @@ function FilaMateria({ materia }: { materia: Inscripcion }) {
   ].filter(Boolean);
 
   return (
-    <Tarjeta>
-      <View style={{ gap: 4 }}>
-        <Text style={[e.asignatura, { color: c.text }]}>{materia.asignatura?.trim()}</Text>
-        <Text style={{ color: c.textSecondary, fontSize: 13 }}>{detalles.join(' · ')}</Text>
-        {typeof materia.porcasis === 'number' && materia.porcasis > 0 ? (
-          <Text style={{ color: c.textSecondary, fontSize: 13 }}>
-            Asistencia: {materia.porcasis}%
-          </Text>
-        ) : null}
-      </View>
-    </Tarjeta>
+    <Pressable onPress={onDetalle} disabled={!onDetalle}>
+      <Tarjeta>
+        <View style={e.filaMateria}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={[e.asignatura, { color: c.text }]}>{materia.asignatura?.trim()}</Text>
+            <Text style={{ color: c.textSecondary, fontSize: 13 }}>{detalles.join(' · ')}</Text>
+            {typeof materia.porcasis === 'number' && materia.porcasis > 0 ? (
+              <Text style={{ color: c.textSecondary, fontSize: 13 }}>
+                Asistencia: {materia.porcasis}%
+              </Text>
+            ) : null}
+          </View>
+          {onDetalle ? (
+            <Text style={{ color: c.marca, fontSize: 13, fontWeight: '600' }}>Más info</Text>
+          ) : null}
+        </View>
+      </Tarjeta>
+    </Pressable>
   );
 }
 
@@ -428,6 +450,7 @@ const e = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  filaMateria: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   secciones: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, marginTop: Spacing.two },
   chip: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderRadius: 8 },
   tilde: { color: '#fff', fontSize: 14, fontWeight: '700' },

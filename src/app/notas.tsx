@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   Aviso,
@@ -15,6 +15,7 @@ import {
 import { SelectorMalla } from '@/components/selector-malla';
 import { Peligro, Spacing } from '@/constants/theme';
 import { Extension, NotaFinal, NotasFinales } from '@/lib/api';
+import { compartirNotasPdf } from '@/lib/pdf-notas';
 import { useSesion } from '@/lib/sesion';
 import { useApi } from '@/lib/useApi';
 
@@ -76,10 +77,37 @@ export default function Notas() {
 
 function Finales({ datos }: { datos: NotasFinales | null }) {
   const c = useColores();
+  const { info, codcarsec, matriculas } = useSesion();
   const notas = datos?.notas ?? [];
   // Por defecto los semestres más recientes primero: es lo que se consulta.
   const [recientesPrimero, setRecientesPrimero] = useState(true);
   const [detalle, setDetalle] = useState<NotaFinal | null>(null);
+  const [generando, setGenerando] = useState(false);
+
+  async function exportarPdf() {
+    setGenerando(true);
+    try {
+      const alumno = (info?.alumno ?? {}) as Record<string, unknown>;
+      await compartirNotasPdf({
+        facultad: info?.facultad?.nombreCompleto ?? info?.facultad?.nombre ?? '',
+        carrera:
+          String(
+            matriculas.find((m) => (m.codcarsec ?? '').trim() === codcarsec)?.carrera ?? ''
+          ).trim(),
+        nombre: String((info?.user as Record<string, unknown> | undefined)?.nameAndSurname ?? ''),
+        cedula: String(alumno.cedula ?? '').trim(),
+        notas,
+        promedio: datos?.promedio ?? 0,
+      });
+    } catch (err) {
+      Alert.alert(
+        'No se pudo generar el PDF',
+        err instanceof Error ? err.message : 'Error desconocido.'
+      );
+    } finally {
+      setGenerando(false);
+    }
+  }
 
   /**
    * Materias que entran en el promedio.
@@ -127,6 +155,16 @@ function Finales({ datos }: { datos: NotasFinales | null }) {
         <Text style={{ color: c.textSecondary, fontSize: 13 }}>Orden</Text>
         <Text style={{ color: c.marca, fontSize: 13, fontWeight: '600' }}>
           {recientesPrimero ? 'Últimos semestres primero' : 'Primeros semestres primero'}
+        </Text>
+      </Pressable>
+
+      <Pressable
+        onPress={exportarPdf}
+        disabled={generando}
+        style={[e.orden, { backgroundColor: c.backgroundElement, opacity: generando ? 0.5 : 1 }]}>
+        <Text style={{ color: c.textSecondary, fontSize: 13 }}>Notas finales</Text>
+        <Text style={{ color: c.marca, fontSize: 13, fontWeight: '600' }}>
+          {generando ? 'Generando PDF…' : 'Descargar PDF'}
         </Text>
       </Pressable>
 
