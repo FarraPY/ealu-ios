@@ -168,22 +168,21 @@ function Habilitadas({
 
     Alert.alert(
       'Guardar preinscripción',
-      `Vas a guardar ${marcadas} materia(s)` +
-        (sinMarcar ? ` y dejar ${sinMarcar} sin marcar` : '') +
-        '.\n\nEn muchas facultades esto ya NO se puede deshacer ni completar ' +
-        'después. Revisá que estén todas las materias que vas a cursar.',
+      `Se guardan ${marcadas} materia(s)` +
+        (sinMarcar ? `; las ${sinMarcar} sin marcar quedan fuera` : '') +
+        '.\n\nPodés volver y cambiarla las veces que quieras: recién se envía ' +
+        'cuando la cerrás.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Guardar',
-          style: 'destructive',
           onPress: async () => {
             setGuardando(true);
             try {
               await registrar();
               Alert.alert(
                 'Guardada',
-                'Tu selección se registró. Verificala en Preinscriptas.'
+                'Tu selección quedó guardada. Todavía podés modificarla; se envía al cerrar la preinscripción.'
               );
               onGuardado();
             } catch (err) {
@@ -216,8 +215,9 @@ function Habilitadas({
     };
 
     const aviso =
-      `Vas a guardar y cerrar tu preinscripción con ${marcadas} materia(s).\n\n` +
-      'Una vez cerrada NO vas a poder hacer cambios.';
+      `Vas a cerrar tu preinscripción con ${marcadas} materia(s).\n\n` +
+      'Después de cerrarla NO vas a poder cambiar la selección ni agregar otras ' +
+      'materias. Asegurate de que estén TODAS las que vas a cursar.';
 
     Alert.alert(
       'Cerrar preinscripción',
@@ -253,10 +253,10 @@ function Habilitadas({
 
   return (
     <>
-      {/* La web dice que desmarcar y volver a guardar borra una materia, pero en
-          la práctica no siempre se puede deshacer: con `generarDeudaIns` la
-          matrícula se emite al guardar y queda fija. Mejor advertir de más. */}
-      <Aviso texto="Revisá bien antes de guardar: en muchas facultades la preinscripción no se puede deshacer ni completar después, aunque la web sugiera que sí. Elegí de una vez TODAS las materias del semestre." />
+      {/* Guardar deja un borrador que sobrevive al cierre de la app; cerrar es lo
+          que envía y congela la selección. Distinguirlo bien importa: cerrar de
+          más deja al alumno sin poder inscribirse al resto de sus materias. */}
+      <Aviso texto="Guardar conserva tu selección para seguir después. Cerrar envía lo guardado y ya no vas a poder cambiarla ni agregar otras materias." />
 
       {/* Solo la cuenta: un "N de M" haría pensar que M es un tope, y no lo hay. */}
       <Text style={{ color: c.textSecondary, fontSize: 13, marginBottom: Spacing.one }}>
