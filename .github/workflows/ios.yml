@@ -20,11 +20,23 @@ env:
 
 jobs:
   build:
-    runs-on: macos-15
+    # SDK 57 arrastra paquetes que piden Swift tools 6.2, o sea Xcode 26.
+    # macos-15 trae Xcode 16.4 (Swift 6.1) y falla al resolver dependencias.
+    runs-on: macos-26
     timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Elegir el Xcode más reciente del runner
+        run: |
+          set -euo pipefail
+          echo "Xcode instalados:"
+          ls -d /Applications/Xcode*.app
+          XC=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+          swift --version
 
       - uses: actions/setup-node@v4
         with:
