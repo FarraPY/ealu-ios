@@ -1,0 +1,342 @@
+import { useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+
+import {
+  Aviso,
+  Cargando,
+  ListaDatos,
+  Pantalla,
+  Segmentos,
+  Tarjeta,
+  useColores,
+} from '@/components/base';
+import { SelectorMalla } from '@/components/selector-malla';
+import { Spacing } from '@/constants/theme';
+import {
+  apiPostForm,
+  AsignaturaHabilitada,
+  desenvolver,
+  Inscripcion,
+  RespuestaHabilitadas,
+} from '@/lib/api';
+import { useSesion } from '@/lib/sesion';
+import { useApi } from '@/lib/useApi';
+
+const AMBITOS = ['Materias', 'Exámenes'] as const;
+type Ambito = (typeof AMBITOS)[number];
+
+const VISTAS = ['Disponibles', 'Preinscriptas', 'Inscriptas', 'Horarios'] as const;
+type Vista = (typeof VISTAS)[number];
+
+export default function InscripcionScreen() {
+  const { codcarsec } = useSesion();
+  const [ambito, setAmbito] = useState<Ambito>('Materias');
+  const [vista, setVista] = useState<Vista>('Inscriptas');
+
+  const ruta = rutaDe(ambito, vista, codcarsec);
+  const consulta = useApi<unknown>(codcarsec ? ruta : null);
+  const datos = desenvolver(consulta.datos);
+
+  return (
+    <Pantalla refrescando={consulta.refrescando} onRefresh={consulta.recargar}>
+      <SelectorMalla />
+      <Segmentos opciones={AMBITOS} valor={ambito} onCambio={setAmbito} />
+      <Segmentos opciones={VISTAS} valor={vista} onCambio={setVista} />
+
+      {consulta.cargando ? (
+        <Cargando />
+      ) : consulta.error ? (
+        <Aviso texto={consulta.error} />
+      ) : ambito === 'Materias' && vista === 'Disponibles' ? (
+        <Habilitadas
+          respuesta={(consulta.datos as RespuestaHabilitadas) ?? {}}
+          codcarsec={codcarsec}
+          onGuardado={consulta.recargar}
+        />
+      ) : vista === 'Inscriptas' && Array.isArray(datos) && datos.length ? (
+        (datos as Inscripcion[]).map((m, i) => <FilaMateria key={i} materia={m} />)
+      ) : (
+        <ListaDatos datos={datos} vacio={vacioDe(ambito, vista)} />
+      )}
+    </Pantalla>
+  );
+}
+
+function rutaDe(ambito: Ambito, vista: Vista, cc: string): string {
+  if (ambito === 'Materias') {
+    return {
+      Disponibles: `asig-habilitadas/${cc}`,
+      Preinscriptas: `preinscripciones-registradas/${cc}`,
+      Inscriptas: `inscripciones-registradas/${cc}`,
+      Horarios: 'horarios',
+    }[vista];
+  }
+  return {
+    Disponibles: `inscexafinal/examenes-habilitados/${cc}`,
+    Preinscriptas: `inscexafinal/registradas/${cc}`,
+    Inscriptas: `inscexafinal/registradas/${cc}`,
+    Horarios: `horario-examen/${cc}`,
+  }[vista];
+}
+
+/**
+ * Los vacíos de exámenes casi nunca significan un error: en varias facultades la
+ * inscripción a finales se hace presencialmente en la cátedra y recién después
+ * alguien la carga acá —si la carga—. Decirlo evita que el usuario crea que la
+ * app falló y vaya a revisar la web para encontrar lo mismo.
+ */
+function vacioDe(ambito: Ambito, vista: Vista): string {
+  if (vista === 'Horarios') return 'No hay horarios publicados para este período.';
+
+  if (ambito === 'Exámenes') {
+    return vista === 'Disponibles'
+      ? 'No hay exámenes habilitados para inscribirse en línea. En muchas facultades la inscripción se hace presencialmente en cada cátedra, y recién después la cargan al sistema.'
+      : 'No figuran exámenes registrados. Si ya te inscribiste en la cátedra, puede que todavía no lo hayan cargado acá: deslizá hacia abajo para volver a consultar.';
+  }
+
+  return vista === 'Disponibles'
+    ? 'No hay materias habilitadas para preinscribirse en este momento.'
+    : 'No hay registros para esta malla en el período actual.';
+}
+
+// ------------------------------------------------------- preinscripción (POST)
+
+function Habilitadas({
+  respuesta,
+  codcarsec,
+  onGuardado,
+}: {
+  respuesta: RespuestaHabilitadas;
+  codcarsec: string;
+  onGuardado: () => void;
+}) {
+  const c = useColores();
+  const asignaturas = respuesta.data ?? [];
+  const cerrada = respuesta.extraValues?.cierreHecho === true;
+  const eligePago = respuesta.extraValues?.formaPagoSeleccionable === true;
+
+  // value del turno/sección elegido por asignatura; ausente = no seleccionada.
+  const [elegidas, setElegidas] = useState<Record<string, string>>(() => {
+    const inicial: Record<string, string> = {};
+    for (const a of asignaturas) {
+      const sec = a.turnoSeccionList?.find((s) => s.checked);
+      if (a.checked && sec) inicial[a.codasign] = sec.value;
+    }
+    return inicial;
+  });
+  const [guardando, setGuardando] = useState(false);
+
+  if (!asignaturas.length) return <Aviso texto={vacioDe('Materias', 'Disponibles')} />;
+
+  function alternar(a: AsignaturaHabilitada) {
+    setElegidas((prev) => {
+      const copia = { ...prev };
+      if (copia[a.codasign]) delete copia[a.codasign];
+      else copia[a.codasign] = (a.turnoSeccionList?.[0]?.value ?? '').trim();
+      return copia;
+    });
+  }
+
+  /** Paso 1: guarda el borrador. Reversible mientras no se cierre. */
+  async function registrar(): Promise<void> {
+    await apiPostForm(`registrar-preinscripciones/${codcarsec}`, {
+      anhoConvocCodcarsecCodasignTurnoSeccionList: Object.values(elegidas)
+        .filter(Boolean)
+        .join(','),
+    });
+  }
+
+  function guardar() {
+    const marcadas = asignaturas.filter((a) => elegidas[a.codasign]).length;
+    const sinMarcar = asignaturas.length - marcadas;
+
+    Alert.alert(
+      'Guardar preinscripción',
+      `Se guardarán ${marcadas} materia(s).` +
+        (sinMarcar
+          ? `\n\nLas ${sinMarcar} sin marcar quedarán borradas de tu preinscripción, igual que en la web.`
+          : '') +
+        '\n\nEsto todavía no la envía: para eso hay que cerrarla.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Guardar',
+          onPress: async () => {
+            setGuardando(true);
+            try {
+              await registrar();
+              Alert.alert('Guardada', 'Tu selección quedó guardada. Todavía podés modificarla.');
+              onGuardado();
+            } catch (err) {
+              Alert.alert('No se pudo guardar', mensajeDe(err));
+            } finally {
+              setGuardando(false);
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  /** Paso 2: cierra y envía. Irreversible. */
+  function cerrar() {
+    const marcadas = asignaturas.filter((a) => elegidas[a.codasign]).length;
+
+    const ejecutar = async (modoPago: 'CONTADO' | 'CUOTAS') => {
+      setGuardando(true);
+      try {
+        await registrar();
+        await apiPostForm(`cerrar-preinscripcion/${codcarsec}?modoPago=${modoPago}`, {});
+        Alert.alert('Preinscripción cerrada', 'Tu preinscripción fue enviada.');
+        onGuardado();
+      } catch (err) {
+        Alert.alert('No se pudo cerrar', mensajeDe(err));
+      } finally {
+        setGuardando(false);
+      }
+    };
+
+    const aviso =
+      `Vas a guardar y cerrar tu preinscripción con ${marcadas} materia(s).\n\n` +
+      'Una vez cerrada NO vas a poder hacer cambios.';
+
+    Alert.alert(
+      'Cerrar preinscripción',
+      aviso,
+      eligePago
+        ? [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Pago contado', onPress: () => ejecutar('CONTADO') },
+            { text: 'Pago en cuotas', onPress: () => ejecutar('CUOTAS') },
+          ]
+        : [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Cerrar y enviar', style: 'destructive', onPress: () => ejecutar('CONTADO') },
+          ]
+    );
+  }
+
+  if (cerrada) {
+    return (
+      <>
+        <Aviso texto="Ya cerraste tu preinscripción de este período, así que no admite cambios. Podés ver el detalle en Preinscriptas." />
+        {asignaturas.map((a) => (
+          <Tarjeta key={a.codasign}>
+            <Text style={[e.asignatura, { color: c.text }]}>
+              {a.asignaturaStr?.trim() || a.asignatura?.trim()}
+            </Text>
+            <Text style={{ color: c.textSecondary, fontSize: 13 }}>{a.curso?.trim()}</Text>
+          </Tarjeta>
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Aviso texto="Primero guardá tu selección y después cerrá la preinscripción para enviarla. Desmarcar una materia y guardar la borra." />
+
+      {asignaturas.map((a) => {
+        const seleccionada = !!elegidas[a.codasign];
+        return (
+          <Pressable key={a.codasign} onPress={() => a.puedeModificar && alternar(a)}>
+            <Tarjeta>
+              <View style={e.fila}>
+                <View
+                  style={[
+                    e.casilla,
+                    { borderColor: seleccionada ? c.marca : c.textSecondary },
+                    seleccionada && { backgroundColor: c.marca },
+                  ]}>
+                  {seleccionada ? <Text style={e.tilde}>✓</Text> : null}
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={[e.asignatura, { color: c.text }]}>
+                    {a.asignaturaStr?.trim() || a.asignatura?.trim()}
+                  </Text>
+                  <Text style={{ color: c.textSecondary, fontSize: 13 }}>
+                    {[a.curso?.trim(), a.turnoSeccionList?.[0]?.text?.trim()]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Text>
+                  {!a.puedeModificar ? (
+                    <Text style={{ color: c.textSecondary, fontSize: 12 }}>No modificable</Text>
+                  ) : null}
+                </View>
+              </View>
+            </Tarjeta>
+          </Pressable>
+        );
+      })}
+
+      <Pressable
+        onPress={guardar}
+        disabled={guardando}
+        style={[e.boton, { backgroundColor: c.backgroundElement, opacity: guardando ? 0.5 : 1 }]}>
+        <Text style={[e.botonTexto, { color: c.text }]}>
+          {guardando ? 'Guardando…' : 'Guardar preinscripción'}
+        </Text>
+      </Pressable>
+
+      <Pressable
+        onPress={cerrar}
+        disabled={guardando}
+        style={[e.boton, { backgroundColor: c.marca, opacity: guardando ? 0.5 : 1 }]}>
+        <Text style={[e.botonTexto, { color: '#fff' }]}>Guardar y cerrar preinscripción</Text>
+      </Pressable>
+    </>
+  );
+}
+
+function mensajeDe(err: unknown): string {
+  return err instanceof Error ? err.message : 'Error desconocido.';
+}
+
+// ------------------------------------------------------------ materias cursando
+
+function FilaMateria({ materia }: { materia: Inscripcion }) {
+  const c = useColores();
+  const detalles = [
+    materia.curso?.trim(),
+    materia.turno && materia.seccion
+      ? `${materia.turno.trim()}/${materia.seccion.trim()}`
+      : null,
+    materia.anho ? String(materia.anho) : null,
+  ].filter(Boolean);
+
+  return (
+    <Tarjeta>
+      <View style={{ gap: 4 }}>
+        <Text style={[e.asignatura, { color: c.text }]}>{materia.asignatura?.trim()}</Text>
+        <Text style={{ color: c.textSecondary, fontSize: 13 }}>{detalles.join(' · ')}</Text>
+        {typeof materia.porcasis === 'number' && materia.porcasis > 0 ? (
+          <Text style={{ color: c.textSecondary, fontSize: 13 }}>
+            Asistencia: {materia.porcasis}%
+          </Text>
+        ) : null}
+      </View>
+    </Tarjeta>
+  );
+}
+
+const e = StyleSheet.create({
+  fila: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  asignatura: { fontSize: 15, fontWeight: '600' },
+  casilla: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tilde: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  boton: {
+    marginTop: Spacing.three,
+    height: 50,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  botonTexto: { color: '#fff', fontSize: 16, fontWeight: '700' },
+});

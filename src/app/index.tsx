@@ -1,98 +1,112 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Aviso, Cargando, Pantalla, Tarjeta, Titulo, useColores } from '@/components/base';
+import { SelectorMalla } from '@/components/selector-malla';
+import { Peligro, Spacing } from '@/constants/theme';
+import { NotasFinales, UltimaNota } from '@/lib/api';
+import { useSesion } from '@/lib/sesion';
+import { useApi } from '@/lib/useApi';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+export default function Inicio() {
+  const c = useColores();
+  const { info, codcarsec } = useSesion();
+
+  const ultimas = useApi<UltimaNota[]>(codcarsec ? `ultimas-notas/${codcarsec}` : null);
+  const finales = useApi<NotasFinales>(codcarsec ? `notas_finales/${codcarsec}` : null);
+  const deuda = useApi<boolean>('deudas/tiene-deuda');
+
+  const user = info?.user as Record<string, unknown> | undefined;
+  const nombre = (user?.nameAndSurname as string) ?? '';
+  const carrera = (info?.matriculaList?.find((m) => m.codcarsec?.trim() === codcarsec)
+    ?.carrera as string) ?? '';
+
+  const recargar = () => {
+    ultimas.recargar();
+    finales.recargar();
+    deuda.recargar();
+  };
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <Pantalla refrescando={ultimas.refrescando} onRefresh={recargar}>
+      <Text style={[e.nombre, { color: c.text }]}>{nombre}</Text>
+      <Text style={{ color: c.textSecondary, fontSize: 14, marginBottom: Spacing.two }}>
+        {info?.facultad?.nombre}
+        {carrera ? ` · ${carrera.trim()}` : ''}
+      </Text>
+
+      <SelectorMalla />
+
+      <View style={e.fila}>
+        <Metrica
+          valor={finales.datos ? finales.datos.promedio.toFixed(2) : '—'}
+          etiqueta="Promedio"
+        />
+        <Metrica
+          valor={finales.datos ? String(finales.datos.notas.length) : '—'}
+          etiqueta="Materias aprobadas"
+        />
+      </View>
+
+      {deuda.datos === true ? <Aviso texto="Tenés deudas pendientes. Mirá la pestaña Cuenta." /> : null}
+
+      <Titulo>Últimas notas · 30 días</Titulo>
+      {ultimas.cargando ? (
+        <Cargando />
+      ) : ultimas.error ? (
+        <Aviso texto={ultimas.error} />
+      ) : !ultimas.datos?.length ? (
+        <Aviso texto="No hay notas cargadas en los últimos 30 días. Las notas aparecen cuando la cátedra las sube al sistema." />
+      ) : (
+        <>
+          {ultimas.datos.map((n, i) => (
+            <FilaUltimaNota key={i} nota={n} />
+          ))}
+          <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: Spacing.one }}>
+            Si rendiste hace poco y no figura, todavía no la cargaron. Deslizá para actualizar.
+          </Text>
+        </>
+      )}
+    </Pantalla>
   );
 }
 
-export default function HomeScreen() {
+function Metrica({ valor, etiqueta }: { valor: string; etiqueta: string }) {
+  const c = useColores();
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+    <View style={[e.metrica, { backgroundColor: c.backgroundElement }]}>
+      <Text style={[e.metricaValor, { color: c.text }]}>{valor}</Text>
+      <Text style={{ color: c.textSecondary, fontSize: 12 }}>{etiqueta}</Text>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+function FilaUltimaNota({ nota }: { nota: UltimaNota }) {
+  const c = useColores();
+  // La escala es 1 a 5; el 1 es aplazo.
+  const aplazado = nota.ausente || nota.nota === 1;
+  return (
+    <Tarjeta>
+      <View style={e.filaNota}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={[e.asignatura, { color: c.text }]}>{nota.asignatura?.trim()}</Text>
+          <Text style={{ color: c.textSecondary, fontSize: 13 }}>
+            {nota.tipoexamen?.trim()} · {nota.fechaexamen}
+          </Text>
+        </View>
+        <Text style={[e.notaValor, { color: aplazado ? Peligro : c.text }]}>
+          {nota.ausente ? 'AUS' : (nota.nota ?? '—')}
+        </Text>
+      </View>
+    </Tarjeta>
+  );
+}
+
+const e = StyleSheet.create({
+  nombre: { fontSize: 26, fontWeight: '700' },
+  fila: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three },
+  metrica: { flex: 1, borderRadius: 14, padding: Spacing.three, gap: 2 },
+  metricaValor: { fontSize: 28, fontWeight: '700' },
+  filaNota: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  asignatura: { fontSize: 15, fontWeight: '600' },
+  notaValor: { fontSize: 26, fontWeight: '700', minWidth: 46, textAlign: 'right' },
 });
