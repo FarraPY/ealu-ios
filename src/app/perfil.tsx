@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Aviso, Cargando, Pantalla, Segmentos, Tarjeta, Titulo, useColores } from '@/components/base';
+import { CambiarContrasena } from '@/components/cambiar-contrasena';
 import { SelectorMalla } from '@/components/selector-malla';
 import { ListaDatos } from '@/components/base';
 import { Marca, Peligro, Spacing } from '@/constants/theme';
@@ -30,6 +31,7 @@ export default function PerfilScreen() {
   const c = useColores();
   const { info, codcarsec, cerrarSesion } = useSesion();
   const [vista, setVista] = useState<Vista>('Cédula');
+  const [cambiando, setCambiando] = useState(false);
 
   const perfil = useApi<Perfil>(codcarsec ? `perfil?codcarsec=${codcarsec}` : null);
   const vehicular = useApi<unknown>(vista === 'Vehicular' ? 'solicitud-acceso-vehicular' : null);
@@ -80,13 +82,22 @@ export default function PerfilScreen() {
         />
       )}
 
-      <Titulo>Sesión</Titulo>
+      <Titulo>Cuenta</Titulo>
       <Text style={{ color: c.textSecondary, fontSize: 13, marginBottom: Spacing.two }}>
         {info?.facultad?.nombreCompleto}
       </Text>
+
+      <Pressable
+        onPress={() => setCambiando(true)}
+        style={[e.salir, { backgroundColor: c.backgroundElement, marginBottom: Spacing.two }]}>
+        <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>Cambiar contraseña</Text>
+      </Pressable>
+
       <Pressable onPress={confirmarSalida} style={[e.salir, { backgroundColor: c.backgroundElement }]}>
         <Text style={{ color: Peligro, fontSize: 16, fontWeight: '600' }}>Cerrar sesión</Text>
       </Pressable>
+
+      <CambiarContrasena visible={cambiando} onCerrar={() => setCambiando(false)} />
     </Pantalla>
   );
 }

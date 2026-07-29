@@ -229,6 +229,53 @@ export type AsignaturaHabilitada = {
   turnoSeccionList: TurnoSeccion[];
 };
 
+// ------------------------------------------------------------------ contraseña
+
+/**
+ * Cambia la contraseña y actualiza la guardada en el Keychain.
+ *
+ * Sin ese segundo paso la app queda con la contraseña vieja y el re-login
+ * automático empieza a fallar en silencio: el usuario acaba expulsado la próxima
+ * vez que el servidor caduque la sesión.
+ */
+export async function cambiarContrasena(
+  actual: string,
+  nueva: string,
+  confirmar: string
+): Promise<void> {
+  const cuerpo =
+    `currentPass=${encodeURIComponent(actual)}` +
+    `&newPass=${encodeURIComponent(nueva)}` +
+    `&confirmPass=${encodeURIComponent(confirmar)}`;
+
+  const res = await pedir(
+    'perfil/cambiar-contrasenha',
+    {
+      method: 'POST',
+      body: cuerpo,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    },
+    true
+  );
+
+  // El backend puede responder 200 con un mensaje de error en el cuerpo.
+  const texto = await res.text();
+  if (texto) {
+    try {
+      const json = JSON.parse(texto) as { success?: boolean; errorMessage?: string };
+      if (json.success === false) {
+        throw new ApiError(json.errorMessage || 'No se pudo cambiar la contraseña.');
+      }
+    } catch (e) {
+      if (e instanceof ApiError) throw e;
+      // Respuesta no JSON: si el HTTP fue correcto, se toma como éxito.
+    }
+  }
+
+  const creds = await leerCredenciales();
+  if (creds) await guardarCredenciales({ ...creds, password: nueva });
+}
+
 // ------------------------------------------------------------------ facultades
 
 /** Endpoint público: no requiere sesión, por eso no pasa por `pedir`. */

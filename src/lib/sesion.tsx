@@ -1,3 +1,4 @@
+import { File, Paths } from 'expo-file-system';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import {
@@ -5,11 +6,32 @@ import {
   borrarCredenciales,
   Credenciales,
   guardarCredenciales,
+  leerCredenciales,
   login,
   logout as apiLogout,
   Matricula,
   SessionInfo,
 } from '@/lib/api';
+
+/**
+ * Detecta si la app se acaba de instalar.
+ *
+ * El Keychain de iOS **sobrevive a la desinstalación**: sin esta marca, reinstalar
+ * el IPA dejaría la sesión anterior ya iniciada, sin pedir contraseña. El archivo
+ * vive en el sandbox de la app, que sí se borra al desinstalar.
+ */
+function esInstalacionNueva(): boolean {
+  try {
+    const marca = new File(Paths.document, 'ealu-instalado');
+    if (marca.exists) return false;
+    marca.create();
+    marca.write(new Date().toISOString());
+    return true;
+  } catch {
+    // Ante la duda, no borrar credenciales: es peor expulsar al usuario sin motivo.
+    return false;
+  }
+}
 
 type Estado = 'cargando' | 'fuera' | 'dentro';
 
@@ -31,11 +53,24 @@ export function SesionProvider({ children }: { children: React.ReactNode }) {
   const [info, setInfo] = useState<SessionInfo | null>(null);
   const [elegida, setElegida] = useState<string | null>(null);
 
-  // Al abrir la app: si hay credenciales guardadas, apiGet renueva la sesión solo
-  // (401 -> re-login transparente), así que basta con pedir los datos de sesión.
   useEffect(() => {
     let vigente = true;
     (async () => {
+      // Instalación nueva: descartar lo que el Keychain haya conservado.
+      if (esInstalacionNueva()) {
+        await borrarCredenciales();
+        if (vigente) setEstado('fuera');
+        return;
+      }
+
+      // Sin credenciales guardadas no se entra, aunque el servidor todavía tenga
+      // viva la cookie. Es lo que hace que "cerrar sesión" realmente cierre.
+      const creds = await leerCredenciales();
+      if (!creds) {
+        if (vigente) setEstado('fuera');
+        return;
+      }
+
       try {
         const datos = await apiGet<SessionInfo>('sesion-ealu/info');
         if (vigente) {
