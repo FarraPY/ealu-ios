@@ -250,6 +250,40 @@ usa `arancel0/datatable`, que es lo que hace la web.
 
 Es un problema de la plataforma, no del cliente: conviene reportarlo al CNC-UNA.
 
+## Los PDF de notas se arman en el cliente
+
+No hay endpoint que devuelva el PDF de notas: la web lo dibuja en el navegador con jsPDF.
+La app hace lo mismo con `expo-print`. Son dos PDF distintos, ambos replicados en
+[`pdf-formato.ts`](src/lib/pdf-formato.ts):
+
+| Origen | Columnas | Pie | Nombre del archivo |
+| --- | --- | --- | --- |
+| Calificaciones › Finales | ASIGNATURA, FECHA, N° ACTA, PUNTAJE, NOTA | `PROMEDIO:` | `notas_finales_{codcarsec}_{apellido}_{nombre}.pdf` |
+| Calificaciones › Libres | ASIGNATURA, FECHA, N° ACTA, NOTA, CRED/HS | — | `notas_libres_{codcarsec}_{username}.pdf` |
+
+**El formato es uno solo para todas las facultades.** En su código no hay ningún condicional
+por facultad: las coordenadas están fijas y lo único que varía sale de `sesion-ealu/info` →
+`facultad`, que son el nombre del encabezado (`nombreCompleto`) y el escudo. El escudo se baja
+de `assets/img/logos/{codigo}.png` y si da 404 cae a `UNA.png` (FACEN no tiene archivo propio).
+Un alumno de Derecho recibe el mismo formato con su escudo, no el de Medicina.
+
+Detalles del original que son fáciles de pasar por alto:
+
+- Cada semestre se rotula **siempre** `(COMPLETO)` o `(INCOMPLETO)`, nunca a secas.
+- Agrupa por el nombre del semestre (`cursoStr`), ordenando por `codcurso` y a igualdad por
+  nombre. La tabla de la web usa `descripcurso`, el PDF usa `cursoStr`.
+- Su `toText` **quita los acentos** de la carrera, el nombre, la cédula, la asignatura, el acta
+  y la descripción de la nota; el nombre del semestre no pasa por ahí. La ñ sobrevive.
+- Asignaturas de más de 70 caracteres se cortan y bajan a 6 pt; de más de 50, solo bajan a 7 pt.
+- El promedio se imprime tal como llega, sin redondear.
+
+`npm run verificar` comprueba todo eso sin levantar la app.
+
+Lo que **no** coincide con el original, porque `expo-print` renderiza HTML en vez de dibujar en
+coordenadas: las métricas de fuente y, por lo tanto, dónde corta exactamente cada página. Los
+metadatos del documento (`author`/`creator: CNC`) tampoco se pueden fijar desde `expo-print`.
+Para que sea idéntico byte a byte habría que portar jsPDF 1.x a la app.
+
 ## Criterio de diseño: no filtrar lo que manda la API
 
 La app muestra **todas** las secciones de la web aunque la facultad no las use, y no oculta

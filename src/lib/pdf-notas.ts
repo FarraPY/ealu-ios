@@ -1,39 +1,27 @@
 /**
- * Genera el PDF de notas finales en el dispositivo.
+ * Genera los PDF de notas en el dispositivo.
  *
- * La web lo arma en el navegador con jsPDF: no hay endpoint que lo devuelva, así
- * que hay que construirlo del lado del cliente igual que ellos. Se replica el
- * formato del original (encabezado de la facultad, agrupado por semestre,
- * asignatura / fecha / acta / puntaje / nota).
+ * La web los arma en el navegador con jsPDF: no hay endpoint que los devuelva,
+ * así que hay que construirlos del lado del cliente igual que ellos.
+ *
+ * El formato es UNO SOLO para todas las facultades. En su código no hay ningún
+ * condicional por facultad: las coordenadas están fijas y lo único que varía es
+ * el escudo (`facultad.codigo`) y el nombre de la facultad, los dos leídos de la
+ * sesión. Un alumno de Derecho recibe el mismo formato con su propio escudo.
+ *
+ * Las medidas de acá replican las del original, que dibuja en milímetros sobre
+ * A4: caja del encabezado de 15 a 200 mm, filas cada 5 mm, escudo de 15×15 mm.
  */
+import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import { shareAsync } from 'expo-sharing';
 
-import { NotaFinal } from '@/lib/api';
-
-function escapar(s: unknown): string {
-  return String(s ?? '')
-    .trim()
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-export type DatosPdf = {
-  facultad: string;
-  /** Código de facultad: define qué logo lleva el encabezado. */
-  codigoFacultad: string;
-  carrera: string;
-  nombre: string;
-  cedula: string;
-  notas: NotaFinal[];
-  promedio: number;
-};
+import { Comun, DatosPdf, htmlFinales, htmlLibres, NotaLibre } from '@/lib/pdf-formato';
 
 const LOGOS = 'https://www.cnc.una.py/ealu/assets/img/logos/';
 
 /**
- * Logo del encabezado, como data URI.
+ * Escudo del encabezado, como data URI.
  *
  * La web hace `imgToBase64("assets/img/logos/" + codigo + ".png")` y si falla cae
  * a `UNA.png`: cada facultad tiene su escudo y algunas (FACEN) no tienen archivo
@@ -53,105 +41,50 @@ async function logoDe(codigo: string): Promise<string | null> {
         lector.readAsDataURL(blob);
       });
     } catch {
-      // Probar el siguiente; el PDF se genera igual sin logo.
+      // Probar el siguiente; el PDF se genera igual sin escudo.
     }
   }
   return null;
 }
 
-function agrupar(notas: NotaFinal[]) {
-  const mapa = new Map<number, { titulo: string; notas: NotaFinal[] }>();
-  for (const n of notas) {
-    const clave = n.codcurso ?? 0;
-    // El original rotula "(COMPLETO)" cuando el semestre está cerrado.
-    const completo = n.cursocompleto?.trim().toUpperCase() === 'S';
-    const base = n.descripcurso?.trim() || 'Sin curso';
-    const g = mapa.get(clave) ?? {
-      titulo: completo ? `${base} (COMPLETO)` : base,
-      notas: [],
-    };
-    g.notas.push(n);
-    mapa.set(clave, g);
-  }
-  return [...mapa.entries()].sort((a, b) => a[0] - b[0]);
-}
-
-function html(d: DatosPdf, logo: string | null): string {
-  let i = 0;
-  const cuerpo = agrupar(d.notas)
-    .map(([, g]) => {
-      const filas = g.notas
-        .map((n) => {
-          i += 1;
-          return `<tr>
-            <td class="n">${i})</td>
-            <td>${escapar(n.descripasign)}</td>
-            <td class="c">${escapar(n.fechaExaDMY ?? '')}</td>
-            <td class="c">${escapar(n.nroacta)}</td>
-            <td class="c">${escapar(n.puntajeef ?? '')}</td>
-            <td class="c">${escapar(n.nota)} (${escapar(n.descripnota)})</td>
-          </tr>`;
-        })
-        .join('');
-      return `<tr><td colspan="6" class="grupo">${escapar(g.titulo)}</td></tr>${filas}`;
-    })
-    .join('');
-
-  return `<!doctype html><html><head><meta charset="utf-8"><style>
-    body { font-family: -apple-system, Helvetica, sans-serif; font-size: 11px; color: #000; padding: 24px; }
-    h1 { font-size: 13px; text-align: center; margin: 0; line-height: 1.5; flex: 1; }
-    .encabezado { display: flex; align-items: center; gap: 12px; }
-    /* Mismo tamaño que en el PDF de la web: 102x100 px. */
-    .logo { width: 51px; height: 50px; object-fit: contain; }
-    .datos { margin: 16px 0 12px; font-size: 11px; border-top: 1px solid #000;
-             border-bottom: 1px solid #000; padding: 6px 0; }
-    .datos div { margin-bottom: 3px; }
-    .linea { display: flex; justify-content: space-between; gap: 16px; }
-    table { width: 100%; border-collapse: collapse; }
-    th { font-size: 10px; text-align: left; border-bottom: 1px solid #000; padding: 4px 3px; }
-    td { padding: 3px; font-size: 10.5px; }
-    td.c { text-align: center; white-space: nowrap; }
-    td.n { width: 26px; color: #555; }
-    .grupo { font-weight: bold; text-align: center; padding-top: 10px;
-             border-bottom: 1px solid #999; font-size: 10.5px; }
-    .pie { margin-top: 18px; font-size: 11px; font-weight: bold; text-align: right; }
-    .aviso { margin-top: 10px; font-size: 9px; color: #666; text-align: center; }
-  </style></head><body>
-    <div class="encabezado">
-      ${logo ? `<img class="logo" src="${logo}" alt="">` : '<div class="logo"></div>'}
-      <h1>UNIVERSIDAD NACIONAL DE ASUNCIÓN<br>${escapar(d.facultad)}<br>NOTAS FINALES</h1>
-      <div class="logo"></div>
-    </div>
-    <div class="datos">
-      <div><b>CARRERA:</b> ${escapar(d.carrera)}</div>
-      <div class="linea">
-        <span><b>NOMBRES Y APELLIDOS:</b> ${escapar(d.nombre)}</span>
-        <span><b>CÉDULA:</b> ${escapar(d.cedula)}</span>
-      </div>
-    </div>
-    <table>
-      <thead><tr>
-        <th></th><th>ASIGNATURA</th><th style="text-align:center">FECHA</th>
-        <th style="text-align:center">N° ACTA</th><th style="text-align:center">PUNTAJE</th>
-        <th style="text-align:center">NOTA</th>
-      </tr></thead>
-      <tbody>${cuerpo}</tbody>
-    </table>
-    <div class="pie">PROMEDIO: ${d.promedio.toFixed(2)}</div>
-  </body></html>`;
-}
-
 /**
- * Genera el PDF y abre la hoja de compartir de iOS, desde donde se puede guardar
- * en Archivos o enviarlo. Equivale al botón "DESCARGAR PDF" de la web, que
- * también construye el documento en el cliente (con jsPDF).
+ * Imprime el HTML y abre la hoja de compartir, desde donde se puede guardar en
+ * Archivos o enviarlo.
+ *
+ * `printToFileAsync` devuelve un nombre temporal, así que se renombra al que usa
+ * su `openPdf` para que el archivo guardado quede igual que el de la web.
  */
-export async function compartirNotasPdf(d: DatosPdf): Promise<void> {
-  const logo = await logoDe(d.codigoFacultad);
-  const { uri } = await Print.printToFileAsync({ html: html(d, logo) });
-  await shareAsync(uri, {
+async function compartir(html: string, nombre: string): Promise<void> {
+  const { uri } = await Print.printToFileAsync({ html });
+  const archivo = new File(uri);
+  const destino = new File(Paths.cache, nombre);
+  if (destino.exists) destino.delete();
+  archivo.move(destino);
+  await shareAsync(archivo.uri, {
     UTI: 'com.adobe.pdf',
     mimeType: 'application/pdf',
-    dialogTitle: 'Notas finales',
+    dialogTitle: nombre,
   });
+}
+
+/** Nombre de archivo tal como lo arma su `openPdf`. */
+function nombreArchivo(prefijo: string, codcarsec: string, sufijo: string): string {
+  return `${prefijo}_${codcarsec.trim()}_${sufijo}.pdf`;
+}
+
+export async function compartirNotasPdf(d: DatosPdf, apellidoNombre: string): Promise<void> {
+  const logo = await logoDe(d.codigoFacultad);
+  await compartir(
+    htmlFinales(d, logo),
+    nombreArchivo('notas_finales', d.codcarsec, apellidoNombre)
+  );
+}
+
+export async function compartirLibresPdf(
+  d: Comun,
+  libres: NotaLibre[],
+  usuario: string
+): Promise<void> {
+  const logo = await logoDe(d.codigoFacultad);
+  await compartir(htmlLibres(d, libres, logo), nombreArchivo('notas_libres', d.codcarsec, usuario));
 }

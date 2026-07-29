@@ -16,7 +16,8 @@ import { ContenidoDistribucion } from '@/components/distribucion-notas';
 import { SelectorMalla } from '@/components/selector-malla';
 import { Peligro, Spacing } from '@/constants/theme';
 import { Extension, NotaFinal, NotasFinales } from '@/lib/api';
-import { compartirNotasPdf } from '@/lib/pdf-notas';
+import { NotaLibre } from '@/lib/pdf-formato';
+import { compartirLibresPdf, compartirNotasPdf } from '@/lib/pdf-notas';
 import { useSesion } from '@/lib/sesion';
 import { useApi } from '@/lib/useApi';
 
@@ -46,6 +47,65 @@ function fechaDe(ms: number | null | undefined): string | null {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
+/**
+ * Datos de identidad del encabezado de los PDF: son los mismos para finales y
+ * libres, y todos salen de la sesión (incluido el escudo de la facultad).
+ */
+function useDatosPdf() {
+  const { info, codcarsec, matriculas } = useSesion();
+  const alumno = (info?.alumno ?? {}) as Record<string, unknown>;
+  const user = (info?.user ?? {}) as Record<string, unknown>;
+  const nombre = `${String(alumno.nombre ?? '')} ${String(alumno.apellido ?? '')}`.trim();
+
+  return {
+    comun: {
+      facultad: info?.facultad?.nombreCompleto ?? info?.facultad?.nombre ?? '',
+      codigoFacultad: info?.facultad?.codigo ?? '',
+      carrera: String(
+        matriculas.find((m) => (m.codcarsec ?? '').trim() === codcarsec)?.carrera ?? ''
+      ).trim(),
+      nombre: nombre || String(user.nameAndSurname ?? ''),
+      cedula: String(alumno.cedula ?? '').trim(),
+      codcarsec,
+    },
+    // Su `openPdf` nombra finales con apellido_nombre y libres con el usuario.
+    apellidoNombre: `${String(alumno.apellido ?? '').trim()}_${String(alumno.nombre ?? '').trim()}`,
+    usuario: String(user.username ?? '').trim(),
+  };
+}
+
+/** Botón de descarga, con el aviso de error ya resuelto. */
+function BotonPdf({ etiqueta, generar }: { etiqueta: string; generar: () => Promise<void> }) {
+  const c = useColores();
+  const [generando, setGenerando] = useState(false);
+
+  async function alTocar() {
+    setGenerando(true);
+    try {
+      await generar();
+    } catch (err) {
+      Alert.alert(
+        'No se pudo generar el PDF',
+        err instanceof Error ? err.message : 'Error desconocido.'
+      );
+    } finally {
+      setGenerando(false);
+    }
+  }
+
+  return (
+    <Pressable
+      onPress={alTocar}
+      disabled={generando}
+      style={[e.orden, { backgroundColor: c.backgroundElement, opacity: generando ? 0.5 : 1 }]}>
+      <Text style={{ color: c.textSecondary, fontSize: 13 }}>{etiqueta}</Text>
+      <Text style={{ color: c.marca, fontSize: 13, fontWeight: '600' }}>
+        {generando ? 'Generando PDF…' : 'Descargar PDF'}
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function Notas() {
   const { codcarsec } = useSesion();
   const [vista, setVista] = useState<Vista>('Finales');
@@ -67,6 +127,8 @@ export default function Notas() {
         <Firmas datos={consulta.datos as Firma[] | null} />
       ) : vista === 'Extensión' ? (
         <ExtensionUniv datos={consulta.datos as Extension | null} />
+      ) : vista === 'Libres' ? (
+        <Libres datos={consulta.datos as NotaLibre[] | null} />
       ) : (
         <ListaDatos datos={consulta.datos} vacio={VACIO[vista]} />
       )}
@@ -78,39 +140,12 @@ export default function Notas() {
 
 function Finales({ datos }: { datos: NotasFinales | null }) {
   const c = useColores();
-  const { info, codcarsec, matriculas } = useSesion();
+  const { codcarsec } = useSesion();
+  const { comun, apellidoNombre } = useDatosPdf();
   const notas = datos?.notas ?? [];
   // Por defecto los semestres más recientes primero: es lo que se consulta.
   const [recientesPrimero, setRecientesPrimero] = useState(true);
   const [detalle, setDetalle] = useState<NotaFinal | null>(null);
-  const [distribucion, setDistribucion] = useState<NotaFinal | null>(null);
-  const [generando, setGenerando] = useState(false);
-
-  async function exportarPdf() {
-    setGenerando(true);
-    try {
-      const alumno = (info?.alumno ?? {}) as Record<string, unknown>;
-      await compartirNotasPdf({
-        facultad: info?.facultad?.nombreCompleto ?? info?.facultad?.nombre ?? '',
-        codigoFacultad: info?.facultad?.codigo ?? '',
-        carrera:
-          String(
-            matriculas.find((m) => (m.codcarsec ?? '').trim() === codcarsec)?.carrera ?? ''
-          ).trim(),
-        nombre: String((info?.user as Record<string, unknown> | undefined)?.nameAndSurname ?? ''),
-        cedula: String(alumno.cedula ?? '').trim(),
-        notas,
-        promedio: datos?.promedio ?? 0,
-      });
-    } catch (err) {
-      Alert.alert(
-        'No se pudo generar el PDF',
-        err instanceof Error ? err.message : 'Error desconocido.'
-      );
-    } finally {
-      setGenerando(false);
-    }
-  }
 
   /**
    * Materias que entran en el promedio.
@@ -161,15 +196,12 @@ function Finales({ datos }: { datos: NotasFinales | null }) {
         </Text>
       </Pressable>
 
-      <Pressable
-        onPress={exportarPdf}
-        disabled={generando}
-        style={[e.orden, { backgroundColor: c.backgroundElement, opacity: generando ? 0.5 : 1 }]}>
-        <Text style={{ color: c.textSecondary, fontSize: 13 }}>Notas finales</Text>
-        <Text style={{ color: c.marca, fontSize: 13, fontWeight: '600' }}>
-          {generando ? 'Generando PDF…' : 'Descargar PDF'}
-        </Text>
-      </Pressable>
+      <BotonPdf
+        etiqueta="Notas finales"
+        generar={() =>
+          compartirNotasPdf({ ...comun, notas, promedio: datos?.promedio ?? 0 }, apellidoNombre)
+        }
+      />
 
       {/* El gap va en cada grupo: el del ScrollView solo separa los grupos entre
           sí, no las tarjetas de adentro. */}
@@ -288,6 +320,49 @@ function DetalleNota({
         </ScrollView>
       </View>
     </Modal>
+  );
+}
+
+// ----------------------------------------------------------------------- libres
+
+/**
+ * Actas libres. La web tiene su propio PDF acá, con columnas distintas a las de
+ * finales (CRED/HS en vez de PUNTAJE) y sin promedio al pie.
+ */
+function Libres({ datos }: { datos: NotaLibre[] | null }) {
+  const c = useColores();
+  const { comun, usuario } = useDatosPdf();
+  if (!datos?.length) return <Aviso texto={VACIO.Libres} />;
+
+  return (
+    <>
+      <BotonPdf
+        etiqueta="Notas libres"
+        generar={() => compartirLibresPdf(comun, datos, usuario)}
+      />
+      {datos.map((n, i) => (
+        <Tarjeta key={i}>
+          <View style={{ gap: 4 }}>
+            <Text style={[e.asignatura, { color: c.text }]}>{n.descripasign?.trim()}</Text>
+            <Text style={{ color: c.textSecondary, fontSize: 13 }}>
+              {[
+                (n.cursoStr ?? n.descripcurso)?.trim(),
+                n.nroacta?.trim() ? `Acta ${n.nroacta.trim()}` : null,
+                n.fechaExaDMY,
+                n.cantcred ? `${n.cantcred} créd./hs` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
+          </View>
+          {n.nota ? (
+            <Text style={{ color: c.text, fontSize: 15, fontWeight: '600', marginTop: 4 }}>
+              {n.nota.trim()} ({n.descripnota?.trim()})
+            </Text>
+          ) : null}
+        </Tarjeta>
+      ))}
+    </>
   );
 }
 

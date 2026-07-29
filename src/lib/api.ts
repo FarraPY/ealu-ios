@@ -26,7 +26,10 @@ export type Facultad = {
   tieneParciales?: boolean;
   tienePreinscasig?: boolean;
   tieneInscexafinal?: boolean;
-  /** Tope de materias que admite una preinscripción (Medicina: 5). */
+  /**
+   * Lo devuelve la API, pero NO es un tope: en Medicina llega 5 y se pueden
+   * preinscribir 6 materias. No se usa para limitar nada.
+   */
   maxPreinscasig?: number;
 };
 
@@ -353,6 +356,8 @@ export type NotaFinal = {
   codasign: string;
   descripasign: string;
   descripcurso: string;
+  /** Nombre del semestre que usa su PDF para agrupar; la tabla usa `descripcurso`. */
+  cursoStr?: string | null;
   descripnota: string;
   nota: string;
   valornota: number;
