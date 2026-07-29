@@ -270,12 +270,19 @@ export type NotaFinal = {
   cantcred: number;
   anho: number;
   fecha: number | null;
+  /** Orden real del semestre; `descripcurso` es texto y no se puede ordenar. */
+  codcurso: number;
+  nroacta: string | null;
+  codescala: string | null;
+  observacion: string | null;
 };
 
 export type NotasFinales = { notas: NotaFinal[]; promedio: number };
 
 export type Deuda = {
   concepto: string;
+  /** Materias que componen la deuda; el concepto solo no dice por qué se debe. */
+  asignaturas: string | null;
   montoStr: string;
   saldoStr: string;
   saldo: number;
@@ -283,9 +290,36 @@ export type Deuda = {
   fechaVencimiento: string | null;
 };
 
+// ------------------------------------------------------- extensión universitaria
+
+export type ActividadExtension = {
+  descripcion: string;
+  tipoEvento: string;
+  anho: number;
+  horasEvento: number;
+  fechaInicio: number | null;
+  fechaFin: number | null;
+};
+
+export type ResumenExtension = {
+  horasRequeridas: number;
+  horasCumplidas: number;
+  horasAjustadas: number;
+  minactreq: number;
+  activcount: number;
+  creds_completo: string;
+  extensionList: ActividadExtension[];
+};
+
+export type Extension = {
+  resumenExtension: ResumenExtension | null;
+  resumenExtensionPorTipoEvento: unknown;
+};
+
 export type Inscripcion = {
   asignatura: string;
   curso: string;
+  codcurso: number | null;
   turno: string | null;
   seccion: string | null;
   anho: number;

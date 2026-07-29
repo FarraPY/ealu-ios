@@ -38,6 +38,9 @@ entre reinicios, así que la cookie sobrevive sola.
 | `inscexaparcial/reg/*`, `inscexaparcial/recup/*` | GET/POST | Solo facultades con `tieneParciales`. |
 | `deudas/tiene-deuda` | GET | Booleano. |
 | `deudas/pendientes` | GET | `[{ concepto, monto, montoStr, saldo, saldoStr, numeroCuota, fechaVencimiento }]` |
+| `arancel0/datatable` | GET | Conceptos con arancel cero **del alumno**. Devuelve `{ aaData, recordsTotal }`. |
+| `actividad_extension/{codcarsec}` | GET | `{ resumenExtension: { horasRequeridas, horasCumplidas, extensionList[] }, resumenExtensionPorTipoEvento }` |
+| `firmas/{codcarsec}` | GET | Incluye `promedioponderado` y duración de la firma. |
 | `acciones-acad`, `dashboard/mensajes` | GET | |
 | `perfil?codcarsec={codcarsec}` | GET | Datos personales. |
 | `perfil/foto.png`, `perfil/qr.png` | GET | Imágenes; requieren cookie de sesión. |
@@ -235,6 +238,17 @@ Guardar y enviar no son lo mismo. La app replica el comportamiento de la web:
 Ojo con dos cosas: la lista enviada es el estado completo, así que **desmarcar una materia y
 guardar la borra**; y `extraValues.cierreHecho` en la respuesta de `asig-habilitadas` indica
 que el período ya se cerró y no admite cambios.
+
+## No usar `solicitud-gratuidad`
+
+`GET solicitud-gratuidad` devuelve las solicitudes de **todos los alumnos**, con cédula,
+sexo, estado civil, teléfono, dirección y correo, a cualquier usuario autenticado. No filtra
+por el alumno de la sesión.
+
+La app **no debe llamar a ese endpoint**. Para los conceptos con arancel cero del alumno se
+usa `arancel0/datatable`, que es lo que hace la web.
+
+Es un problema de la plataforma, no del cliente: conviene reportarlo al CNC-UNA.
 
 ## Criterio de diseño: no filtrar lo que manda la API
 

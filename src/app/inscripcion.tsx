@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -8,6 +8,7 @@ import {
   Pantalla,
   Segmentos,
   Tarjeta,
+  Titulo,
   useColores,
 } from '@/components/base';
 import { SelectorMalla } from '@/components/selector-malla';
@@ -53,8 +54,8 @@ export default function InscripcionScreen() {
           codcarsec={codcarsec}
           onGuardado={consulta.recargar}
         />
-      ) : vista === 'Inscriptas' && Array.isArray(datos) && datos.length ? (
-        (datos as Inscripcion[]).map((m, i) => <FilaMateria key={i} materia={m} />)
+      ) : Array.isArray(datos) && datos.length && vista !== 'Horarios' ? (
+        <PorSemestre materias={datos as Inscripcion[]} />
       ) : (
         <ListaDatos datos={datos} vacio={vacioDe(ambito, vista)} />
       )}
@@ -73,7 +74,8 @@ function rutaDe(ambito: Ambito, vista: Vista, cc: string): string {
   }
   return {
     Disponibles: `inscexafinal/examenes-habilitados/${cc}`,
-    Preinscriptas: `inscexafinal/registradas/${cc}`,
+    // `buff` es el buffer de preinscripción, distinto de las ya registradas.
+    Preinscriptas: `inscexafinal/buff/${cc}`,
     Inscriptas: `inscexafinal/registradas/${cc}`,
     Horarios: `horario-examen/${cc}`,
   }[vista];
@@ -293,6 +295,37 @@ function mensajeDe(err: unknown): string {
 }
 
 // ------------------------------------------------------------ materias cursando
+
+/**
+ * Agrupa por semestre igual que Calificaciones. Sin esto, una lista de 18 materias
+ * de años distintos es imposible de leer de un vistazo.
+ */
+function PorSemestre({ materias }: { materias: Inscripcion[] }) {
+  const grupos = useMemo(() => {
+    const mapa = new Map<string, { orden: number; materias: Inscripcion[] }>();
+    for (const m of materias) {
+      const titulo = [m.curso?.trim(), m.anho].filter(Boolean).join(' · ') || 'Sin curso';
+      const g = mapa.get(titulo) ?? { orden: (m.anho ?? 0) * 100 + (m.codcurso ?? 0), materias: [] };
+      g.materias.push(m);
+      mapa.set(titulo, g);
+    }
+    // Más reciente arriba.
+    return [...mapa.entries()].sort((a, b) => b[1].orden - a[1].orden);
+  }, [materias]);
+
+  return (
+    <>
+      {grupos.map(([titulo, g]) => (
+        <View key={titulo}>
+          <Titulo>{titulo}</Titulo>
+          {g.materias.map((m, i) => (
+            <FilaMateria key={i} materia={m} />
+          ))}
+        </View>
+      ))}
+    </>
+  );
+}
 
 function FilaMateria({ materia }: { materia: Inscripcion }) {
   const c = useColores();

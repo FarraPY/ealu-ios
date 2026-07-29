@@ -23,9 +23,12 @@ export default function Cuenta() {
   const [vista, setVista] = useState<Vista>('Deudas');
 
   const deudas = useApi<Deuda[]>('deudas/pendientes');
-  const otros = useApi<unknown>(
+  // OJO: no usar `solicitud-gratuidad`. Ese endpoint devuelve las solicitudes de
+  // TODOS los alumnos (con cédula, teléfono, dirección y correo), no las propias.
+  // El listado del alumno es `arancel0/datatable`, igual que en la web.
+  const otros = useApi<{ aaData?: unknown[] }>(
     vista === 'Arancel Cero'
-      ? 'solicitud-gratuidad'
+      ? 'arancel0/datatable'
       : vista === 'Fraccionar'
         ? 'deudas/fraccionamiento-info'
         : null
@@ -63,10 +66,10 @@ export default function Cuenta() {
         <Cargando />
       ) : (
         <ListaDatos
-          datos={otros.error ? null : otros.datos}
+          datos={otros.error ? null : (otros.datos?.aaData ?? otros.datos)}
           vacio={
             vista === 'Arancel Cero'
-              ? 'No hay solicitudes de arancel cero registradas.'
+              ? 'No tenés conceptos con arancel cero.'
               : 'No hay información de fraccionamiento disponible.'
           }
         />
@@ -82,30 +85,61 @@ export default function Cuenta() {
 
 function FilaDeuda({ deuda }: { deuda: Deuda }) {
   const c = useColores();
+  // El backend separa el concepto de las materias que lo componen; la web las
+  // muestra juntas y sin ellas no se sabe por qué se debe.
+  const materias = deuda.asignaturas?.replace(/,\s*$/, '').trim();
+
   return (
     <Tarjeta>
-      <View style={{ gap: 4 }}>
+      <View style={{ gap: 6 }}>
         <Text style={[e.concepto, { color: c.text }]}>{deuda.concepto?.trim()}</Text>
-        <View style={e.entre}>
-          <Text style={{ color: c.textSecondary, fontSize: 13 }}>
-            {[
-              deuda.numeroCuota ? `Cuota ${deuda.numeroCuota}` : null,
-              deuda.fechaVencimiento ? `Vence ${deuda.fechaVencimiento}` : null,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </Text>
-          <Text style={[e.monto, { color: c.text }]}>{deuda.saldoStr ?? deuda.montoStr}</Text>
+
+        {materias ? (
+          <Text style={{ color: c.textSecondary, fontSize: 13, lineHeight: 18 }}>{materias}</Text>
+        ) : null}
+
+        <View style={e.datos}>
+          {deuda.numeroCuota ? <Dato etiqueta="Cuota" valor={String(deuda.numeroCuota)} /> : null}
+          {deuda.fechaVencimiento ? (
+            <Dato etiqueta="Vencimiento" valor={deuda.fechaVencimiento} />
+          ) : null}
+          <Dato etiqueta="Monto" valor={`${deuda.montoStr} Gs.`} />
+          <Dato etiqueta="Saldo" valor={`${deuda.saldoStr} Gs.`} destacado />
         </View>
       </View>
     </Tarjeta>
   );
 }
 
+function Dato({
+  etiqueta,
+  valor,
+  destacado,
+}: {
+  etiqueta: string;
+  valor: string;
+  destacado?: boolean;
+}) {
+  const c = useColores();
+  return (
+    <View style={e.dato}>
+      <Text style={{ color: c.textSecondary, fontSize: 12 }}>{etiqueta}</Text>
+      <Text
+        style={{
+          color: destacado ? Peligro : c.text,
+          fontSize: destacado ? 17 : 15,
+          fontWeight: destacado ? '700' : '500',
+        }}>
+        {valor}
+      </Text>
+    </View>
+  );
+}
+
 const e = StyleSheet.create({
   total: { fontSize: 32, fontWeight: '700' },
-  entre: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: Spacing.two },
-  concepto: { fontSize: 15, fontWeight: '600' },
-  monto: { fontSize: 17, fontWeight: '700' },
+  concepto: { fontSize: 16, fontWeight: '600' },
+  datos: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.four, marginTop: Spacing.one },
+  dato: { gap: 1 },
   nota: { fontSize: 12, lineHeight: 17, marginTop: Spacing.three },
 });

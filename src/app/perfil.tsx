@@ -115,7 +115,8 @@ function useImagenApi(path: string | null) {
 function Cedula({ perfil }: { perfil: Perfil | null }) {
   const { info, codcarsec, matriculas } = useSesion();
   const foto = useImagenApi('perfil/foto.png');
-  const qr = useImagenApi('perfil/qr.png');
+  // Sin `codcarsec` el backend responde 400: el QR depende de la matrícula.
+  const qr = useImagenApi(codcarsec ? `perfil/qr.png?codcarsec=${codcarsec}` : null);
 
   const alumno = (info?.alumno ?? {}) as Record<string, unknown>;
   const carrera = matriculas.find((m) => (m.codcarsec ?? '').trim() === codcarsec)?.carrera;
