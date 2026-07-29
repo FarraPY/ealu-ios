@@ -107,6 +107,14 @@ jobs:
           echo "Scheme detectado: $SCHEME"
           echo "SCHEME_REAL=$SCHEME" >> "$GITHUB_ENV"
 
+          # SDK 57 trae dependencias por Swift Package Manager (expo-image y otras).
+          # Resolverlas aparte deja el fallo aislado y legible si la red del runner
+          # o una versión no cuadran, en vez de perderse dentro del archive.
+          echo "::group::Resolver dependencias Swift Package Manager"
+          xcodebuild -resolvePackageDependencies "${CONTAINER[@]}" -scheme "$SCHEME" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm" 2>&1 | tail -40
+          echo "::endgroup::"
+
           # Guardar el log completo: xcodebuild entierra el error real entre miles
           # de líneas de "note:", y la web de Actions las virtualiza.
           set +e
@@ -116,6 +124,7 @@ jobs:
             -configuration Release \
             -archivePath "$RUNNER_TEMP/app.xcarchive" \
             -destination "generic/platform=iOS" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
@@ -127,8 +136,8 @@ jobs:
 
           if [ $STATUS -ne 0 ]; then
             echo "::group::=== ERRORES DE COMPILACION ==="
-            grep -nE "error:|ARCHIVE FAILED|The following build commands failed|Command .* failed|No profile|no signing certificate|Signing for" \
-              "$RUNNER_TEMP/xcodebuild.log" | tail -40 || echo "(sin lineas de error reconocibles)"
+            grep -nE -A 8 "error:|ARCHIVE FAILED|The following build commands failed|Command .* failed|No profile|no signing certificate|Signing for" \
+              "$RUNNER_TEMP/xcodebuild.log" | tail -70 || echo "(sin lineas de error reconocibles)"
             echo "::endgroup::"
             echo "::group::=== ULTIMAS 60 LINEAS ==="
             tail -60 "$RUNNER_TEMP/xcodebuild.log"
