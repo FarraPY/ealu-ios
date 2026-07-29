@@ -19,6 +19,10 @@ import {
  * El Keychain de iOS **sobrevive a la desinstalación**: sin esta marca, reinstalar
  * el IPA dejaría la sesión anterior ya iniciada, sin pedir contraseña. El archivo
  * vive en el sandbox de la app, que sí se borra al desinstalar.
+ *
+ * En Android no hace falta —SecureStore se borra junto con la app—, pero tampoco
+ * molesta: en una instalación limpia no hay marca ni credenciales, así que el
+ * resultado es el mismo. Se deja igual para las dos plataformas.
  */
 function esInstalacionNueva(): boolean {
   try {

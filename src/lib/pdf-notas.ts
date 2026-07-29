@@ -28,6 +28,16 @@ import {
 const LOGOS = 'https://www.cnc.una.py/ealu/assets/img/logos/';
 
 /**
+ * Tamaño de página A4 en puntos, el mismo que usa su `new jsPDF('p', 'mm', 'a4')`.
+ *
+ * Hay que pasarlo explícito: `printToFileAsync` usa US Letter (612×792) por
+ * defecto, que es 6 mm más ancho y 18 mm más corto que A4, así que las páginas
+ * cortaban en otro punto que el original. La regla `@page size` del CSS no
+ * alcanza, porque el tamaño del papel lo fija el módulo.
+ */
+const A4 = { width: 595.28, height: 841.89 };
+
+/**
  * Escudo del encabezado, como data URI.
  *
  * La web hace `imgToBase64("assets/img/logos/" + codigo + ".png")` y si falla cae
@@ -67,7 +77,7 @@ async function logoDe(codigo: string): Promise<string | null> {
  * `moveSync`, que es la variante síncrona.
  */
 async function compartir(html: string, nombre: string): Promise<void> {
-  const { uri } = await Print.printToFileAsync({ html });
+  const { uri } = await Print.printToFileAsync({ html, ...A4 });
   const archivo = new File(uri);
   const destino = new File(Paths.cache, nombre);
   if (destino.exists) destino.delete();

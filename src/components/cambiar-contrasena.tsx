@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useColores } from '@/components/base';
-import { Peligro, Spacing } from '@/constants/theme';
+import { CabeceraModalInset, Peligro, Spacing } from '@/constants/theme';
 import { cambiarContrasena } from '@/lib/api';
 
 export function CambiarContrasena({ visible, onCerrar }: { visible: boolean; onCerrar: () => void }) {
@@ -153,7 +153,13 @@ function Campo({
 }
 
 const e = StyleSheet.create({
-  cabecera: { flexDirection: 'row', alignItems: 'center', padding: Spacing.three, gap: Spacing.three },
+  cabecera: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.three,
+    paddingTop: Spacing.three + CabeceraModalInset,
+    gap: Spacing.three,
+  },
   aviso: { borderRadius: 12, padding: Spacing.three },
   input: { borderRadius: 12, paddingHorizontal: Spacing.three, height: 48, fontSize: 16 },
   boton: {

@@ -62,11 +62,20 @@ src/app/                  5 pestañas: Inicio, Notas, Inscripción, Cuenta, Perf
 
 ## Compilar e instalar (desde Windows, sin Mac)
 
-**La vía que funciona es GitHub Actions** (`.github/workflows/ios.yml`), no EAS Build. Ver
-"Por qué GitHub Actions y no EAS" más abajo.
+Hay un workflow por plataforma, y los dos corren en cada push a `main`.
+
+| Plataforma | Workflow | Runner | Artefacto | Secrets |
+| --- | --- | --- | --- | --- |
+| iOS | `.github/workflows/ios.yml` | `macos-26` | `ealu-ipa` (~11 MB) | 3, ver abajo |
+| Android | `.github/workflows/android.yml` | `ubuntu-latest` | `ealu-apk` | ninguno |
+
+### iOS
+
+**La vía que funciona es GitHub Actions**, no EAS Build. Ver "Por qué GitHub Actions y no EAS"
+más abajo.
 
 ```
-Actions > Compilar IPA iOS > Run workflow  ->  artefacto "ealu-ipa" (~14 MB)
+Actions > Compilar IPA iOS > Run workflow  ->  artefacto "ealu-ipa"
 ```
 
 Necesita tres secrets en el repositorio (`Settings > Secrets and variables > Actions`):
@@ -84,6 +93,41 @@ Cuatro cosas que costaron un build cada una, por si hay que rehacer el workflow:
 3. Las dependencias Swift Package Manager conviene resolverlas en un paso aparte.
 4. Hace falta **Xcode 26** (Swift 6.2). En `macos-15` (Xcode 16.4 / Swift 6.1) falla con
    `package 'apple' is using Swift tools version 6.2.0`. Por eso `runs-on: macos-26`.
+
+### Android
+
+No necesita ningún secret. La plantilla de Expo firma la variante `release` con el keystore de
+depuración que genera el propio `prebuild`, así que el APK sale instalable de una:
+
+```
+Actions > Compilar APK Android  ->  artefacto "ealu-apk"
+```
+
+Se instala habilitando "Instalar apps desconocidas" para el navegador o el gestor de archivos.
+
+Dos límites de esa firma, por si algún día importan: **no se puede subir a Google Play**, y no
+sirve como prueba de identidad, porque el keystore de depuración es público y su contraseña es
+`android`. Para cualquiera de las dos cosas hay que generar un keystore propio, guardarlo como
+secret y agregar su `signingConfig`.
+
+El mismo código corre en las dos plataformas; lo que hubo que ajustar fue:
+
+- **Los modales.** En iOS usan `presentationStyle="pageSheet"`, que arranca por debajo de la
+  barra de estado. En Android el `Modal` ocupa la pantalla entera desde y=0, así que el botón
+  "Cerrar" quedaba tapado. De eso se encarga `CabeceraModalInset` en `constants/theme.ts`;
+  `useSafeAreaInsets` no sirve porque el `Modal` se monta fuera del SafeAreaProvider.
+- **La cookie de sesión.** En Android va por el CookieManager del WebView, que no guarda las
+  cookies sin `Max-Age`. Al reabrir la app no hay sesión y entra el re-login transparente, una
+  vez por arranque. El usuario no lo ve.
+- **El icono.** Android usa icono adaptativo: fondo del sistema (`#990301`) más una capa con
+  alfa. `scripts/generar-icono.js` la saca del icono de iOS recortando el granate
+  (`transparente ... clave:#990301`), con margen suficiente para que entre en la máscara
+  circular, que solo deja ver el 61% central.
+
+Lo que **no** hizo falta tocar: las pestañas ya declaraban iconos Material (`md=`) junto a los
+SF Symbols, y las reglas de respaldo de `expo-secure-store` ya excluyen las credenciales del
+backup en la nube y de la transferencia entre dispositivos, así que al reinstalar pide login
+igual que en iOS.
 
 ### Por qué GitHub Actions y no EAS
 

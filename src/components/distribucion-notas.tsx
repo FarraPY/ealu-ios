@@ -12,7 +12,7 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Aviso, Cargando, Tarjeta, Titulo, useColores } from '@/components/base';
-import { Spacing } from '@/constants/theme';
+import { CabeceraModalInset, Spacing } from '@/constants/theme';
 import { Inscripcion, NotaFinal } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 
@@ -243,7 +243,13 @@ export function DistribucionNotas({
 }
 
 const e = StyleSheet.create({
-  cabecera: { flexDirection: 'row', alignItems: 'center', padding: Spacing.three, gap: Spacing.three },
+  cabecera: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.three,
+    paddingTop: Spacing.three + CabeceraModalInset,
+    gap: Spacing.three,
+  },
   entre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   riel: { height: 10, borderRadius: 5, overflow: 'hidden' },
   barra: { height: 10, borderRadius: 5 },

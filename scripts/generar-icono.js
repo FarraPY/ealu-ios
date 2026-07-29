@@ -1,33 +1,55 @@
 /**
- * Convierte cualquier PNG en un icono valido para iOS.
+ * Convierte cualquier PNG en un icono valido para iOS o Android.
  *
  * iOS rechaza iconos con canal alfa, y los logos vienen con fondo transparente:
  * hay que componerlos sobre un color solido. Ademas exige 1024x1024 exactos.
  *
- *   node a-icono.js <entrada.png> <salida.png> [#RRGGBB fondo] [margen 0..0.3] [#RRGGBB tinte]
+ *   node generar-icono.js <entrada.png> <salida.png> [#RRGGBB fondo] [margen 0..0.3] [#RRGGBB tinte]
  *
  * El tinte es opcional: si se pasa, el logo se pinta de ese color usando su canal
  * alfa como mascara. Hace falta cuando el fondo es del mismo color que el logo
  * (un logo granate sobre fondo granate no se ve).
+ *
+ * Para el icono adaptativo de Android el fondo lo pone el sistema
+ * (android.adaptiveIcon.backgroundColor), asi que la capa de adelante tiene que
+ * salir con alfa. Se pide poniendo `transparente` como fondo y pasando en el
+ * quinto argumento el color a recortar:
+ *
+ *   node generar-icono.js icon.png foreground.png transparente 0.22 clave:#990301
+ *
+ * El margen ahi tiene que ser mas grande que en iOS: Android recorta el icono a
+ * un circulo o un cuadrado redondeado, y solo garantiza que se vea el 66% central.
  */
 const zlib = require('zlib');
 const fs = require('fs');
 
 const [, , ENTRADA, SALIDA, FONDO_HEX = '#ffffff', MARGEN = '0.10', TINTE_HEX] = process.argv;
-const tinte = TINTE_HEX
+const alfa = FONDO_HEX === 'transparente';
+/** Color de fondo a recortar, cuando la salida lleva alfa. */
+const clave = TINTE_HEX?.startsWith('clave:')
   ? [
-      parseInt(TINTE_HEX.slice(1, 3), 16),
-      parseInt(TINTE_HEX.slice(3, 5), 16),
-      parseInt(TINTE_HEX.slice(5, 7), 16),
+      parseInt(TINTE_HEX.slice(7, 9), 16),
+      parseInt(TINTE_HEX.slice(9, 11), 16),
+      parseInt(TINTE_HEX.slice(11, 13), 16),
     ]
   : null;
+const tinte =
+  TINTE_HEX && !clave
+    ? [
+        parseInt(TINTE_HEX.slice(1, 3), 16),
+        parseInt(TINTE_HEX.slice(3, 5), 16),
+        parseInt(TINTE_HEX.slice(5, 7), 16),
+      ]
+    : null;
 const N = 1024;
 const margen = parseFloat(MARGEN);
-const fondo = [
-  parseInt(FONDO_HEX.slice(1, 3), 16),
-  parseInt(FONDO_HEX.slice(3, 5), 16),
-  parseInt(FONDO_HEX.slice(5, 7), 16),
-];
+const fondo = alfa
+  ? [0, 0, 0]
+  : [
+      parseInt(FONDO_HEX.slice(1, 3), 16),
+      parseInt(FONDO_HEX.slice(3, 5), 16),
+      parseInt(FONDO_HEX.slice(5, 7), 16),
+    ];
 
 // ------------------------------------------------------------------ leer PNG
 function leerPng(ruta) {
@@ -102,13 +124,14 @@ function leerPng(ruta) {
 
 // ------------------------------------------------- escalar, componer y escribir
 const src = leerPng(ENTRADA);
-const dest = Buffer.alloc(N * N * 3);
+const canales = alfa ? 4 : 3;
+const dest = Buffer.alloc(N * N * canales);
 const lado = Math.round(N * (1 - 2 * margen));
 const desde = Math.round((N - lado) / 2);
 
 for (let y = 0; y < N; y++) {
   for (let x = 0; x < N; x++) {
-    let r = fondo[0], g = fondo[1], b = fondo[2];
+    let r = fondo[0], g = fondo[1], b = fondo[2], salidaAlfa = 0;
     const lx = x - desde, ly = y - desde;
     if (lx >= 0 && ly >= 0 && lx < lado && ly < lado) {
       // Muestreo bilineal para que no quede dentado al reescalar
@@ -141,21 +164,42 @@ for (let y = 0; y < N; y++) {
         src3 = tinte;
       }
 
-      r = Math.round(src3[0] * a + fondo[0] * (1 - a));
-      g = Math.round(src3[1] * a + fondo[1] * (1 - a));
-      b = Math.round(src3[2] * a + fondo[2] * (1 - a));
+      if (clave) {
+        // El logo viene ya compuesto sobre un fondo solido (el icono de iOS).
+        // Se recupera la silueta midiendo cuanto se aleja cada pixel de ese
+        // color: identico al fondo -> transparente, lejano -> opaco. Los bordes
+        // suavizados caen en el medio y conservan el antialiasing.
+        const dist = Math.max(
+          Math.abs(acc[0] - clave[0]),
+          Math.abs(acc[1] - clave[1]),
+          Math.abs(acc[2] - clave[2])
+        );
+        salidaAlfa = Math.min(255, Math.round((dist / 255) * 1.15 * 255));
+        // El color se toma del pixel mas opaco posible para que el borde no
+        // arrastre el granate del fondo original.
+        const f = salidaAlfa > 0 ? 255 / salidaAlfa : 0;
+        r = Math.min(255, Math.round(clave[0] + (acc[0] - clave[0]) * f));
+        g = Math.min(255, Math.round(clave[1] + (acc[1] - clave[1]) * f));
+        b = Math.min(255, Math.round(clave[2] + (acc[2] - clave[2]) * f));
+      } else {
+        r = Math.round(src3[0] * a + fondo[0] * (1 - a));
+        g = Math.round(src3[1] * a + fondo[1] * (1 - a));
+        b = Math.round(src3[2] * a + fondo[2] * (1 - a));
+        salidaAlfa = Math.round(a * 255);
+      }
     }
-    const o = (y * N + x) * 3;
+    const o = (y * N + x) * canales;
     dest[o] = r; dest[o+1] = g; dest[o+2] = b;
+    if (alfa) dest[o+3] = salidaAlfa;
   }
 }
 
-const filas = Buffer.alloc(N * (1 + N * 3));
+const filas = Buffer.alloc(N * (1 + N * canales));
 let o = 0;
 for (let y = 0; y < N; y++) {
   filas[o++] = 0;
-  dest.copy(filas, o, y * N * 3, (y + 1) * N * 3);
-  o += N * 3;
+  dest.copy(filas, o, y * N * canales, (y + 1) * N * canales);
+  o += N * canales;
 }
 
 const tabla = (() => { const t = new Int32Array(256);
@@ -173,7 +217,7 @@ const trozo = (tipo, datos) => {
 };
 const ihdr = Buffer.alloc(13);
 ihdr.writeUInt32BE(N, 0); ihdr.writeUInt32BE(N, 4);
-ihdr[8] = 8; ihdr[9] = 2;
+ihdr[8] = 8; ihdr[9] = alfa ? 6 : 2;
 
 fs.writeFileSync(SALIDA, Buffer.concat([
   Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]),
@@ -181,4 +225,8 @@ fs.writeFileSync(SALIDA, Buffer.concat([
   trozo('IDAT', zlib.deflateSync(filas, { level: 9 })),
   trozo('IEND', Buffer.alloc(0)),
 ]));
-console.log(`icono ${N}x${N} sin alfa sobre ${FONDO_HEX} -> ${SALIDA}`);
+console.log(
+  alfa
+    ? `capa ${N}x${N} con alfa, recortando ${TINTE_HEX} -> ${SALIDA}`
+    : `icono ${N}x${N} sin alfa sobre ${FONDO_HEX} -> ${SALIDA}`
+);

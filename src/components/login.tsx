@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useColores } from '@/components/base';
-import { Spacing } from '@/constants/theme';
+import { CabeceraModalInset, Spacing } from '@/constants/theme';
 import { Facultad, obtenerFacultades } from '@/lib/api';
 import { useSesion } from '@/lib/sesion';
 
@@ -232,7 +232,7 @@ const est = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: Spacing.three,
+    padding: Spacing.three, paddingTop: Spacing.three + CabeceraModalInset,
   },
   modalTitulo: { fontSize: 22, fontWeight: '700' },
   opcion: { padding: Spacing.three, borderRadius: 12 },

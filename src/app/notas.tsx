@@ -14,7 +14,7 @@ import {
 } from '@/components/base';
 import { ContenidoDistribucion } from '@/components/distribucion-notas';
 import { SelectorMalla } from '@/components/selector-malla';
-import { Peligro, Spacing } from '@/constants/theme';
+import { CabeceraModalInset, Peligro, Spacing } from '@/constants/theme';
 import { Extension, NotaFinal, NotasFinales } from '@/lib/api';
 import { NotaLibre } from '@/lib/pdf-formato';
 import { compartirLibresPdf, compartirNotasPdf } from '@/lib/pdf-notas';
@@ -514,7 +514,7 @@ const e = StyleSheet.create({
   modalCabecera: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.three,
+    padding: Spacing.three, paddingTop: Spacing.three + CabeceraModalInset,
     gap: Spacing.three,
   },
   detalleFila: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three },

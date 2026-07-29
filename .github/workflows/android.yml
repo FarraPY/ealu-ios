@@ -1,0 +1,63 @@
+# Compila el APK en un runner Linux de GitHub.
+#
+# A diferencia de iOS, acá no hace falta ningún secreto: la plantilla de Expo
+# firma la variante `release` con el keystore de depuración que genera el propio
+# prebuild (ver android/app/build.gradle). Eso alcanza para instalar el APK a
+# mano, que es cómo se reparte esta app.
+#
+# Lo que NO alcanza: subirlo a Google Play, y no sirve como prueba de identidad
+# (el keystore de depuración es público y su contraseña es "android"). Si algún
+# día hace falta, hay que generar un keystore propio y firmar con ese.
+name: Compilar APK Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'credentials.example.json'
+
+jobs:
+  build:
+    # Android no necesita macOS: sale mucho más rápido y más barato que el IPA.
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # React Native 0.86 usa AGP 8, que pide JDK 17.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generar proyecto Android nativo
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Compilar APK de release
+        run: |
+          set -euo pipefail
+          cd android
+          chmod +x gradlew
+          # --no-daemon: el runner es de un solo uso y el demonio solo agrega
+          # memoria y tiempo de arranque.
+          ./gradlew assembleRelease --no-daemon
+          ls -la app/build/outputs/apk/release/
+
+      - name: Publicar el APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ealu-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 30

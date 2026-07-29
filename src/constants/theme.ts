@@ -5,7 +5,7 @@
 
 import '@/global.css';
 
-import { Platform } from 'react-native';
+import { Platform, StatusBar } from 'react-native';
 
 /** Granate institucional de EALU, tomado de la web (rgb(153, 3, 1)). */
 export const Marca = '#990301';
@@ -71,3 +71,15 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+/**
+ * Relleno extra arriba de la cabecera de un modal.
+ *
+ * En iOS los modales usan `presentationStyle="pageSheet"`, que ya arranca por
+ * debajo de la barra de estado. En Android el `Modal` ocupa la pantalla entera
+ * desde y=0, así que sin esto el botón "Cerrar" queda tapado por la hora y la
+ * batería. `useSafeAreaInsets` no sirve acá: el `Modal` se monta fuera del
+ * SafeAreaProvider y devuelve cero.
+ */
+export const CabeceraModalInset =
+  Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0;

@@ -2,10 +2,17 @@
  * Cliente de la API de EALU (https://api.una.py:8443/ealu-backend/).
  *
  * La autenticación del backend es por cookie de sesión (JSESSIONID), no JWT.
+ *
  * En iOS, fetch usa NSHTTPCookieStorage, que persiste entre reinicios de la app,
- * así que la cookie sobrevive sola. Cuando el servidor la caduca por inactividad
- * respondemos con un login transparente usando las credenciales del Keychain:
- * por eso el usuario no vuelve a ver la pantalla de login.
+ * así que la cookie sobrevive sola. En Android va por el CookieManager del
+ * WebView, que no guarda las cookies de sesión (las que vienen sin Max-Age), así
+ * que al reabrir la app la cookie ya no está.
+ *
+ * En los dos casos el que resuelve es el mismo mecanismo: cuando una respuesta
+ * llega sin sesión hacemos un login transparente con las credenciales guardadas
+ * y reintentamos. En Android eso pasa una vez por arranque y no se nota; en iOS
+ * solo cuando el servidor caduca la sesión por inactividad. Por eso el usuario no
+ * vuelve a ver la pantalla de login en ninguna de las dos plataformas.
  */
 import * as SecureStore from 'expo-secure-store';
 

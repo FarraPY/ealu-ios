@@ -8,7 +8,7 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Aviso, Cargando, Tarjeta, Titulo, useColores } from '@/components/base';
-import { Spacing } from '@/constants/theme';
+import { CabeceraModalInset, Spacing } from '@/constants/theme';
 import { useSesion } from '@/lib/sesion';
 import { useApi } from '@/lib/useApi';
 
@@ -129,6 +129,12 @@ export function ConfirmacionPreinscripcion({
 }
 
 const e = StyleSheet.create({
-  cabecera: { flexDirection: 'row', alignItems: 'center', padding: Spacing.three, gap: Spacing.three },
+  cabecera: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.three,
+    paddingTop: Spacing.three + CabeceraModalInset,
+    gap: Spacing.three,
+  },
   dato: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three },
 });

@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useColores } from '@/components/base';
-import { Spacing } from '@/constants/theme';
+import { CabeceraModalInset, Spacing } from '@/constants/theme';
 import { useSesion } from '@/lib/sesion';
 
 export function SelectorMalla() {
@@ -109,7 +109,7 @@ const e = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: Spacing.three,
+    padding: Spacing.three, paddingTop: Spacing.three + CabeceraModalInset,
   },
   ayuda: { fontSize: 13, lineHeight: 18, paddingHorizontal: Spacing.three },
   opcion: {
