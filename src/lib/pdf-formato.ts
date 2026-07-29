@@ -230,3 +230,16 @@ export function htmlLibres(d: Comun, libres: NotaLibre[], logo: string | null): 
   </body></html>`;
 }
 
+/**
+ * Nombre de archivo tal como lo arma su `openPdf`.
+ *
+ * Los espacios se conservan (el original los tiene si el nombre del alumno los
+ * lleva), pero se quitan los caracteres que no pueden ir en una ruta: un
+ * apellido con barra dejaría el archivo en otra carpeta.
+ */
+export function nombreArchivo(prefijo: string, codcarsec: string, sufijo: string): string {
+  const limpio = `${prefijo}_${codcarsec.trim()}_${sufijo}`
+    .replace(/[/\\:*?"<>|]/g, '')
+    .trim();
+  return `${limpio}.pdf`;
+}

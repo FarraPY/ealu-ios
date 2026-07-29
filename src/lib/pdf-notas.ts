@@ -16,7 +16,14 @@ import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import { shareAsync } from 'expo-sharing';
 
-import { Comun, DatosPdf, htmlFinales, htmlLibres, NotaLibre } from '@/lib/pdf-formato';
+import {
+  Comun,
+  DatosPdf,
+  htmlFinales,
+  htmlLibres,
+  NotaLibre,
+  nombreArchivo,
+} from '@/lib/pdf-formato';
 
 const LOGOS = 'https://www.cnc.una.py/ealu/assets/img/logos/';
 
@@ -53,23 +60,23 @@ async function logoDe(codigo: string): Promise<string | null> {
  *
  * `printToFileAsync` devuelve un nombre temporal, así que se renombra al que usa
  * su `openPdf` para que el archivo guardado quede igual que el de la web.
+ *
+ * OJO con `move`: devuelve una promesa. Sin esperarla, `shareAsync` recibía la
+ * ruta mientras el archivo estaba en tránsito, no encontraba nada y fallaba con
+ * FilePermissionException ("You don't have access to the provided file"). Se usa
+ * `moveSync`, que es la variante síncrona.
  */
 async function compartir(html: string, nombre: string): Promise<void> {
   const { uri } = await Print.printToFileAsync({ html });
   const archivo = new File(uri);
   const destino = new File(Paths.cache, nombre);
   if (destino.exists) destino.delete();
-  archivo.move(destino);
-  await shareAsync(archivo.uri, {
+  archivo.moveSync(destino);
+  await shareAsync(destino.uri, {
     UTI: 'com.adobe.pdf',
     mimeType: 'application/pdf',
     dialogTitle: nombre,
   });
-}
-
-/** Nombre de archivo tal como lo arma su `openPdf`. */
-function nombreArchivo(prefijo: string, codcarsec: string, sufijo: string): string {
-  return `${prefijo}_${codcarsec.trim()}_${sufijo}.pdf`;
 }
 
 export async function compartirNotasPdf(d: DatosPdf, apellidoNombre: string): Promise<void> {

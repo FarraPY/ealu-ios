@@ -13,6 +13,7 @@ import {
   asignatura,
   htmlFinales,
   htmlLibres,
+  nombreArchivo,
   sinAcentos,
   txt,
 } from '../src/lib/pdf-formato.ts';
@@ -162,5 +163,21 @@ assert.doesNotMatch(libres, /PUNTAJE/);
 assert.doesNotMatch(libres, /PROMEDIO/);
 assert.doesNotMatch(libres, /\(COMPLETO\)|\(INCOMPLETO\)/);
 assert.match(libres, /INGLES TECNICO/);
+
+// ------------------------------------------------------- nombre del archivo
+
+// El mismo patron que su openPdf, con los espacios del nombre intactos.
+assert.equal(
+  nombreArchivo('notas_finales', ' 12 ', 'GONZALEZ LOPEZ_JUAN'),
+  'notas_finales_12_GONZALEZ LOPEZ_JUAN.pdf'
+);
+assert.equal(nombreArchivo('notas_libres', '12', 'jperez'), 'notas_libres_12_jperez.pdf');
+
+// Una barra en el apellido dejaria el archivo en otra carpeta: nunca debe pasar.
+for (const malo of ['DE/LA CRUZ', 'X\\Y', 'A:B', 'A*B', 'A?B', 'A"B', 'A<B', 'A>B', 'A|B']) {
+  const n = nombreArchivo('notas_finales', '12', malo);
+  assert.doesNotMatch(n, /[/\\:*?"<>|]/, `nombre con caracter de ruta: ${n}`);
+  assert.match(n, /\.pdf$/);
+}
 
 console.log('formato de PDF: todo en orden');
